@@ -55,9 +55,8 @@ def get_indicators(candles):
 import os
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  # loaded from GitHub secret
 
-# Binance Testnet (paper trading) — no real funds
-BINANCE_BASE_URL = "https://testnet.binance.vision/api"
-# For real trading later, swap to: "https://api.binance.com/api"
+# Binance public API — used for reading candle data only (no API key needed)
+BINANCE_BASE_URL = "https://api.binance.com/api"
 
 # 3Commas webhook (from your Signal Bot setup)
 WEBHOOK_URL = "https://api.3commas.io/signal_bots/webhooks"
