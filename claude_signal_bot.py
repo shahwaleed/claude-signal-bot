@@ -187,10 +187,8 @@ def ask_claude(symbol, ema9, ema21, rsi7):
 # STEP 3 — Fire webhook to 3Commas
 # ─────────────────────────────────────────
 
-def fire_webhook(signal, current_price, symbol="BTCUSDT"):
-    # For reversal bot: BUY = enter_long (closes short + opens long)
-    #                   SELL = enter_short (closes long + opens short)
-    action = "enter_long" if signal["signal"] == "BUY" else "enter_short"
+def send_single_webhook(action, current_price, symbol):
+    """Send a single webhook action to 3Commas."""
     ticker = TICKER_MAP.get(symbol, symbol)
     now_iso = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")  # webhook always UTC
     payload = {
@@ -203,11 +201,10 @@ def fire_webhook(signal, current_price, symbol="BTCUSDT"):
         "action":        action,
         "bot_uuid":      BOT_UUIDS[symbol]
     }
-    print(f"Payload: {json.dumps(payload)}")
+    print(f"Sending action: {action}")
     response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
-    print(f"3Commas response [{response.status_code}]: '{response.text}'")
     if response.status_code == 200:
-        print(f"Webhook: SUCCESS")
+        print(f"Webhook {action}: SUCCESS")
     elif response.status_code == 429:
         print(f"Webhook: RATE LIMITED (429) — too many requests, slow down")
     elif response.status_code == 418:
@@ -215,6 +212,46 @@ def fire_webhook(signal, current_price, symbol="BTCUSDT"):
     else:
         print(f"Webhook: FAILED [{response.status_code}] {response.text}")
     return response.status_code == 200
+
+
+# Track current position per symbol (in memory during run)
+# Values: "long", "short", None
+POSITIONS = {
+    "BTCUSDT": None,
+    "ETHUSDT": None,
+    "SOLUSDT": None,
+    "XRPUSDT": None,
+}
+
+def fire_webhook(signal, current_price, symbol="BTCUSDT"):
+    """Fire correct sequence of webhooks based on signal and current position."""
+    sig = signal["signal"]
+    current_pos = POSITIONS.get(symbol)
+    success = True
+
+    if sig == "BUY":
+        if current_pos == "short":
+            # Exit short first, then enter long
+            success = send_single_webhook("exit_short", current_price, symbol)
+            time.sleep(1)
+            success = send_single_webhook("enter_long", current_price, symbol) and success
+        else:
+            # No position or already long — just enter long
+            success = send_single_webhook("enter_long", current_price, symbol)
+        POSITIONS[symbol] = "long"
+
+    elif sig == "SELL":
+        if current_pos == "long":
+            # Exit long first, then enter short
+            success = send_single_webhook("exit_long", current_price, symbol)
+            time.sleep(1)
+            success = send_single_webhook("enter_short", current_price, symbol) and success
+        else:
+            # No position or already short — just enter short
+            success = send_single_webhook("enter_short", current_price, symbol)
+        POSITIONS[symbol] = "short"
+
+    return success
 
 
 # ─────────────────────────────────────────
