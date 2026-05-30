@@ -52,7 +52,8 @@ def get_indicators(candles):
 # CONFIGURATION — fill these in
 # ─────────────────────────────────────────
 
-ANTHROPIC_API_KEY = "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"   # https://console.anthropic.com
+import os
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  # loaded from GitHub secret
 
 # Binance Testnet (paper trading) — no real funds
 BINANCE_BASE_URL = "https://testnet.binance.vision/api"
