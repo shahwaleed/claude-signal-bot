@@ -55,8 +55,8 @@ def get_indicators(candles):
 import os
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  # loaded from GitHub secret
 
-# Binance public API — used for reading candle data only (no API key needed)
-BINANCE_BASE_URL = "https://api.binance.com/api"
+# CoinGecko API — free, no API key, no geo-restrictions
+COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3"
 
 # 3Commas webhook (from your Signal Bot setup)
 WEBHOOK_URL = "https://api.3commas.io/signal_bots/webhooks"
@@ -86,14 +86,26 @@ CANDLES  = 30
 # STEP 1 — Fetch OHLCV data from Binance
 # ─────────────────────────────────────────
 
+# Map our symbols to CoinGecko IDs
+COINGECKO_IDS = {
+    "BTCUSDT": "bitcoin",
+    "ETHUSDT": "ethereum",
+    "SOLUSDT": "solana",
+    "XRPUSDT": "ripple",
+}
+
 def get_candles(symbol, interval, limit):
-    url = f"{BINANCE_BASE_URL}/v3/klines"
-    params = {"symbol": symbol, "interval": interval, "limit": limit}
+    """Fetch OHLC candles from CoinGecko."""
+    coin_id = COINGECKO_IDS[symbol]
+    # CoinGecko OHLC: days=1 gives 30min candles, days=7 gives 4h candles
+    url = f"{COINGECKO_BASE_URL}/coins/{coin_id}/ohlc"
+    params = {"vs_currency": "usd", "days": "1"}
     response = requests.get(url, params=params, timeout=10)
     response.raise_for_status()
     raw = response.json()
+    # raw is list of [timestamp, open, high, low, close]
     candles = []
-    for c in raw:
+    for c in raw[-limit:]:
         ts = datetime.fromtimestamp(c[0] / 1000, tz=DUBAI_TZ)
         candles.append({
             "time":   ts.strftime("%Y-%m-%d %H:%M"),
@@ -101,7 +113,7 @@ def get_candles(symbol, interval, limit):
             "high":   float(c[2]),
             "low":    float(c[3]),
             "close":  float(c[4]),
-            "volume": float(c[5]),
+            "volume": 0,
         })
     return candles
 
