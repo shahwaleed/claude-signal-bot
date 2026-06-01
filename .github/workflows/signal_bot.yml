@@ -8,11 +8,12 @@ on:
       strategy:
         description: 'Strategy to run'
         required: true
-        default: 'ema_basic'
+        default: 'bollinger'
         type: choice
         options:
-          - ema_basic
+          - bollinger
           - ema_advanced
+          - ema_basic
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -49,10 +50,12 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
-          STRATEGY: ${{ github.event.inputs.strategy || 'ema_advanced' }}
+          STRATEGY: ${{ github.event.inputs.strategy || 'bollinger' }}
         run: |
           echo "Running strategy: $STRATEGY"
-          if [ "$STRATEGY" = "ema_advanced" ]; then
+          if [ "$STRATEGY" = "bollinger" ]; then
+            python strategy_bollinger.py
+          elif [ "$STRATEGY" = "ema_advanced" ]; then
             python strategy_ema_advanced.py
           else
             python claude_signal_bot.py
