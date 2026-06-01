@@ -49,7 +49,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
-          STRATEGY: ${{ github.event.inputs.strategy || 'ema_basic' }}
+          STRATEGY: ${{ github.event.inputs.strategy || 'ema_advanced' }}
         run: |
           echo "Running strategy: $STRATEGY"
           if [ "$STRATEGY" = "ema_advanced" ]; then
