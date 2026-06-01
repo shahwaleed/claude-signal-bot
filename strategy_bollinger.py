@@ -13,6 +13,10 @@ Indicators:
 - RSI-14 (standard for mean reversion, less noisy than RSI-7)
 - Band width (squeeze detection — tight bands = explosive move coming)
 - %B (where price sits within the bands — 0=lower, 0.5=middle, 1=upper)
+
+CoinGecko OHLC valid days values: 1, 7, 14, 30, 90, 180, 365
+- days=1  → 30-min candles (~48 candles)
+- days=7  → 4-hour candles (~42 candles) ← used here for BB-20 + RSI-14
 """
 
 import requests
@@ -60,7 +64,12 @@ MIN_CONFIDENCE = 65
 LOG_FILE       = "trade_log.csv"
 
 
-def get_candles(symbol, days=2):
+def get_candles(symbol, days=7):
+    """
+    Fetch OHLC from CoinGecko.
+    Valid days values: 1, 7, 14, 30, 90, 180, 365
+    days=7 returns 4-hour candles (~42 candles) — enough for BB-20 + RSI-14
+    """
     coin_id = COINGECKO_IDS[symbol]
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc"
     params = {"vs_currency": "usd", "days": str(days)}
@@ -244,7 +253,7 @@ def run():
     for symbol in SYMBOLS:
         print(f"\n--- {symbol} ---")
         try:
-            candles = get_candles(symbol, days=2)
+            candles = get_candles(symbol, days=7)
             time.sleep(2)
             indicators = get_indicators(candles)
             print(f"  Price: ${indicators['price']:,.4f}")
