@@ -8,6 +8,10 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+permissions:
+  actions: read
+  contents: read
+
 jobs:
   run-bot:
     runs-on: ubuntu-latest
@@ -23,7 +27,25 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
+      - name: Download previous trade log
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: signal_bot.yml
+          name: trade-log
+          path: .
+          if_no_artifact_found: ignore
+        continue-on-error: true
+
       - name: Run signal bot
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
         run: python claude_signal_bot.py
+
+      - name: Upload updated trade log
+        uses: actions/upload-artifact@v4
+        with:
+          name: trade-log
+          path: trade_log.csv
+          retention-days: 90
+          overwrite: true
