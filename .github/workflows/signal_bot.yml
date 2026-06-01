@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       strategy:
-        description: 'Strategy to run'
+        description: 'Override strategy (leave empty to use auto-selected from config.json)'
         required: false
         default: ''
         type: choice
@@ -50,12 +50,28 @@ jobs:
           if_no_artifact_found: ignore
         continue-on-error: true
 
-      - name: Select and run strategy
+      - name: Read strategy from config.json or manual override
+        id: strategy
+        run: |
+          MANUAL="${{ github.event.inputs.strategy }}"
+          if [ -n "$MANUAL" ]; then
+            echo "strategy=$MANUAL" >> $GITHUB_OUTPUT
+            echo "Source: manual override — $MANUAL"
+          elif [ -f config.json ]; then
+            AUTO=$(python3 -c "import json; print(json.load(open('config.json'))['strategy'])")
+            echo "strategy=$AUTO" >> $GITHUB_OUTPUT
+            echo "Source: config.json — $AUTO"
+          else
+            echo "strategy=bollinger" >> $GITHUB_OUTPUT
+            echo "Source: default — bollinger"
+          fi
+
+      - name: Run selected strategy
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
-          STRATEGY: ${{ github.event.inputs.strategy || 'bollinger' }}
         run: |
+          STRATEGY="${{ steps.strategy.outputs.strategy }}"
           echo "Running strategy: $STRATEGY"
           if [ "$STRATEGY" = "bollinger" ]; then
             python strategy_bollinger.py
