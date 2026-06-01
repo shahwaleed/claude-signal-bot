@@ -4,6 +4,15 @@ on:
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
+    inputs:
+      strategy:
+        description: 'Strategy to run'
+        required: true
+        default: 'ema_basic'
+        type: choice
+        options:
+          - ema_basic
+          - ema_advanced
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -36,11 +45,18 @@ jobs:
           if_no_artifact_found: ignore
         continue-on-error: true
 
-      - name: Run signal bot
+      - name: Select and run strategy
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
-        run: python claude_signal_bot.py
+          STRATEGY: ${{ github.event.inputs.strategy || 'ema_basic' }}
+        run: |
+          echo "Running strategy: $STRATEGY"
+          if [ "$STRATEGY" = "ema_advanced" ]; then
+            python strategy_ema_advanced.py
+          else
+            python claude_signal_bot.py
+          fi
 
       - name: Upload updated trade log
         uses: actions/upload-artifact@v4
