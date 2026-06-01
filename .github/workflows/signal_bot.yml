@@ -1,0 +1,80 @@
+name: Claude Signal Bot
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      strategy:
+        description: 'Strategy to run'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - bollinger
+          - ema_advanced
+          - vwap
+          - rsi_divergence
+          - breakout
+          - ema_basic
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Download previous trade log
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: signal_bot.yml
+          name: trade-log
+          path: .
+          if_no_artifact_found: ignore
+        continue-on-error: true
+
+      - name: Select and run strategy
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+          STRATEGY: ${{ github.event.inputs.strategy || 'bollinger' }}
+        run: |
+          echo "Running strategy: $STRATEGY"
+          if [ "$STRATEGY" = "bollinger" ]; then
+            python strategy_bollinger.py
+          elif [ "$STRATEGY" = "ema_advanced" ]; then
+            python strategy_ema_advanced.py
+          elif [ "$STRATEGY" = "vwap" ]; then
+            python strategy_vwap.py
+          elif [ "$STRATEGY" = "rsi_divergence" ]; then
+            python strategy_rsi_divergence.py
+          elif [ "$STRATEGY" = "breakout" ]; then
+            python strategy_breakout.py
+          else
+            python claude_signal_bot.py
+          fi
+
+      - name: Upload updated trade log
+        uses: actions/upload-artifact@v4
+        with:
+          name: trade-log
+          path: trade_log.csv
+          retention-days: 90
+          overwrite: true
