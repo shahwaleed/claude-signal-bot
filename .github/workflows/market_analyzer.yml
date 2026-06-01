@@ -2,8 +2,10 @@ name: Market Analyzer
 
 on:
   schedule:
-    - cron: '0 4 * * *'    # 8:00 AM Dubai (UTC+4)
-    - cron: '0 16 * * *'   # 8:00 PM Dubai (UTC+4)
+    - cron: '0 2 * * *'    # 6:00 AM Dubai (UTC+4) — before Asia close
+    - cron: '30 6 * * *'   # 10:30 AM Dubai (UTC+4) — before London open
+    - cron: '30 11 * * *'  # 3:30 PM Dubai (UTC+4) — before NY open (most important)
+    - cron: '0 19 * * *'   # 11:00 PM Dubai (UTC+4) — end of NY session
   workflow_dispatch:
 
 env:
