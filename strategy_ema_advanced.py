@@ -111,6 +111,8 @@ def calculate_rsi(closes, period=7):
     avg_loss = sum(losses[-period:]) / period
     if avg_loss == 0:
         return 100.0
+    if avg_gain == 0:
+        return 1.0  # extremely oversold — return 1 instead of 0 to avoid JSON issues
     rs = avg_gain / avg_loss
     return round(100 - (100 / (1 + rs)), 2)
 
@@ -248,7 +250,7 @@ def ask_claude(symbol, indicators):
     )
     payload = {
         "model": "claude-sonnet-4-6",
-        "max_tokens": 150,
+        "max_tokens": 250,
         "system": SYSTEM_PROMPT,
         "messages": [{"role": "user", "content": msg}]
     }
