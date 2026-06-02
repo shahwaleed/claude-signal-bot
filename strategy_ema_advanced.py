@@ -4,6 +4,7 @@ Strategy: Advanced EMA Crossover
 - RSI divergence detection (price vs RSI direction)
 - EMA 9/21 crossover
 - RSI-7 filter
+- SAR (Stop-and-Reverse): if opposite position is open, close it first then open new direction
 
 Upgrade from basic strategy:
 - Adds 4h trend filter to eliminate false signals in choppy markets
@@ -52,24 +53,53 @@ COINGECKO_IDS = {
     "XRPUSDT": "ripple",
 }
 
-SYMBOLS       = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
-CANDLES_30M   = 30   # 30-min candles for entry signal
-CANDLES_4H    = 30   # 4-hour candles for trend confirmation
-TAKE_PROFIT   = 1.5
-STOP_LOSS     = 3.0
-MIN_CONFIDENCE = 65  # higher threshold for this strategy
+SYMBOLS        = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
+CANDLES_30M    = 30
+CANDLES_4H     = 30
+TAKE_PROFIT    = 1.5
+STOP_LOSS      = 3.0
+MIN_CONFIDENCE = 65
+LOG_FILE       = "trade_log.csv"
 
-LOG_FILE = "trade_log.csv"
+# ─────────────────────────────────────────
+# SAR: in-memory position tracker
+# Tracks what direction is currently open per symbol this run.
+# Since GitHub Actions is stateless, we seed this from the last
+# line of the trade log at startup.
+# Values: "BUY" (long open), "SELL" (short open), or None
+# ─────────────────────────────────────────
+open_positions = {s: None for s in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]}
+
+
+def load_positions_from_log():
+    """Seed open_positions from the last fired signal per symbol in trade_log.csv."""
+    if not os.path.exists(LOG_FILE):
+        return
+    last = {}
+    try:
+        with open(LOG_FILE, "r") as f:
+            for line in f:
+                parts = line.strip().split(",")
+                if len(parts) < 5:
+                    continue
+                # columns: timestamp,symbol,price,signal,confidence,...,webhook_fired,...
+                symbol  = parts[1]
+                signal  = parts[3]
+                fired   = parts[13] if len(parts) > 13 else "False"
+                if symbol in open_positions and signal in ("BUY", "SELL") and fired == "True":
+                    last[symbol] = signal
+        for sym, sig in last.items():
+            open_positions[sym] = sig
+        print("  [SAR] Loaded positions from log:", open_positions)
+    except Exception as e:
+        print(f"  [SAR] Could not load positions from log: {e}")
+
 
 # ─────────────────────────────────────────
 # STEP 1 — Fetch OHLC from CoinGecko
 # ─────────────────────────────────────────
 
 def get_candles(symbol, days):
-    """
-    days=1  → returns ~48 x 30-min candles
-    days=14 → returns ~30 x 4-hour candles
-    """
     coin_id = COINGECKO_IDS[symbol]
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc"
     params = {"vs_currency": "usd", "days": str(days)}
@@ -112,66 +142,43 @@ def calculate_rsi(closes, period=7):
     if avg_loss == 0:
         return 100.0
     if avg_gain == 0:
-        return 1.0  # extremely oversold — return 1 instead of 0 to avoid JSON issues
+        return 1.0
     rs = avg_gain / avg_loss
     return round(100 - (100 / (1 + rs)), 2)
 
 def calculate_rsi_series(closes, period=7):
-    """Return last N RSI values for divergence detection."""
     rsi_values = []
     for i in range(period + 1, len(closes) + 1):
         rsi_values.append(calculate_rsi(closes[:i], period))
     return rsi_values
 
 def detect_divergence(closes, rsi_series, lookback=5):
-    """
-    Bullish divergence: price makes lower low but RSI makes higher low → BUY signal
-    Bearish divergence: price makes higher high but RSI makes lower high → SELL signal
-    Returns: 'bullish', 'bearish', or None
-    """
     if len(closes) < lookback or len(rsi_series) < lookback:
         return None
-
     recent_closes = closes[-lookback:]
     recent_rsi    = rsi_series[-lookback:]
-
-    price_low_now   = recent_closes[-1] < min(recent_closes[:-1])
-    rsi_low_now     = recent_rsi[-1]    < min(recent_rsi[:-1])
-    price_high_now  = recent_closes[-1] > max(recent_closes[:-1])
-    rsi_high_now    = recent_rsi[-1]    > max(recent_rsi[:-1])
-
-    # Bullish: price lower low but RSI NOT lower low (higher low)
+    price_low_now  = recent_closes[-1] < min(recent_closes[:-1])
+    rsi_low_now    = recent_rsi[-1]    < min(recent_rsi[:-1])
+    price_high_now = recent_closes[-1] > max(recent_closes[:-1])
+    rsi_high_now   = recent_rsi[-1]    > max(recent_rsi[:-1])
     if price_low_now and not rsi_low_now:
         return "bullish"
-
-    # Bearish: price higher high but RSI NOT higher high (lower high)
     if price_high_now and not rsi_high_now:
         return "bearish"
-
     return None
 
 def get_indicators(candles_30m, candles_4h):
-    """Calculate all indicators for both timeframes."""
     closes_30m = [c["close"] for c in candles_30m[-30:]]
     closes_4h  = [c["close"] for c in candles_4h[-30:]]
-
-    # 30-min indicators (entry signals)
     ema9_30m  = calculate_ema(closes_30m, 9)
     ema21_30m = calculate_ema(closes_30m, 21)
     rsi7_30m  = calculate_rsi(closes_30m, 7)
-
-    # 4-hour indicators (trend confirmation)
     ema9_4h   = calculate_ema(closes_4h, 9)
     ema21_4h  = calculate_ema(closes_4h, 21)
     rsi7_4h   = calculate_rsi(closes_4h, 7)
-
-    # RSI divergence on 30-min
-    rsi_series_30m  = calculate_rsi_series(closes_30m, 7)
-    divergence      = detect_divergence(closes_30m, rsi_series_30m)
-
-    # 4h trend direction
+    rsi_series_30m = calculate_rsi_series(closes_30m, 7)
+    divergence     = detect_divergence(closes_30m, rsi_series_30m)
     trend_4h = "bullish" if ema9_4h > ema21_4h else "bearish"
-
     return {
         "ema9_30m":   ema9_30m,
         "ema21_30m":  ema21_30m,
@@ -261,9 +268,7 @@ def ask_claude(symbol, indicators):
     }
     response = requests.post(
         "https://api.anthropic.com/v1/messages",
-        headers=headers,
-        json=payload,
-        timeout=30
+        headers=headers, json=payload, timeout=30
     )
     response.raise_for_status()
     raw_text = response.json()["content"][0]["text"].strip()
@@ -276,15 +281,67 @@ def ask_claude(symbol, indicators):
 
 
 # ─────────────────────────────────────────
-# STEP 4 — Fire webhook
+# STEP 4 — SAR webhook logic
 # ─────────────────────────────────────────
 
+def send_close_webhook(symbol, current_price):
+    """Close the current open position at market price."""
+    current = open_positions.get(symbol)
+    if current is None:
+        return False
+    close_action = "exit_long" if current == "BUY" else "exit_short"
+    ticker = TICKER_MAP.get(symbol, symbol)
+    now_iso = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    payload = {
+        "secret":        WEBHOOK_SECRET,
+        "max_lag":       "300",
+        "timestamp":     now_iso,
+        "trigger_price": str(current_price),
+        "tv_exchange":   "BINANCE",
+        "tv_instrument": ticker,
+        "action":        close_action,
+        "bot_uuid":      BOT_UUIDS[symbol],
+    }
+    response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
+    if response.status_code == 200:
+        print(f"  [SAR] Closed {current} position for {symbol} ({close_action})")
+        open_positions[symbol] = None
+        return True
+    else:
+        print(f"  [SAR] Close failed [{response.status_code}]: {response.text}")
+        return False
+
+
 def fire_webhook(signal_str, current_price, symbol):
+    """
+    SAR logic:
+    - If a position is open in the SAME direction → skip (already in trade)
+    - If a position is open in the OPPOSITE direction → close it first, wait 5s, then open new
+    - If no position open → open directly
+    """
+    current = open_positions.get(symbol)
+
+    # Already in same direction — don't double-enter
+    if current == signal_str:
+        print(f"  [SAR] Already in {signal_str} for {symbol} — skipping duplicate entry")
+        return False
+
+    # Opposite position open — close it first (Stop-and-Reverse)
+    if current is not None and current != signal_str:
+        print(f"  [SAR] Reversing {current} → {signal_str} for {symbol}")
+        closed = send_close_webhook(symbol, current_price)
+        if closed:
+            print(f"  [SAR] Waiting 5s before opening {signal_str}...")
+            time.sleep(5)
+        else:
+            print(f"  [SAR] Close failed — aborting reversal for {symbol}")
+            return False
+
+    # Open new position
     action = "enter_long" if signal_str == "BUY" else "enter_short"
     ticker = TICKER_MAP.get(symbol, symbol)
     now_iso = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
     tp_pct = TAKE_PROFIT if signal_str == "BUY" else -TAKE_PROFIT
-    sl_pct = STOP_LOSS
 
     payload = {
         "secret":        WEBHOOK_SECRET,
@@ -297,29 +354,27 @@ def fire_webhook(signal_str, current_price, symbol):
         "bot_uuid":      BOT_UUIDS[symbol],
         "take_profit": {
             "enabled": True,
-            "steps": [{
-                "order_type": "market",
-                "price_percent": tp_pct,
-                "volume_percent": 100
-            }]
+            "steps": [{"order_type": "market", "price_percent": tp_pct, "volume_percent": 100}]
         },
         "stop_loss": {
             "enabled": True,
             "order_type": "market",
-            "trigger_price_percent": sl_pct
+            "trigger_price_percent": STOP_LOSS
         }
     }
 
     response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
     if response.status_code == 200:
         print(f"  Webhook {action}: SUCCESS")
+        open_positions[symbol] = signal_str
+        return True
     elif response.status_code == 429:
         print(f"  Webhook: RATE LIMITED (429)")
     elif response.status_code == 418:
         print(f"  Webhook: BLOCKED (418)")
     else:
         print(f"  Webhook: FAILED [{response.status_code}] {response.text}")
-    return response.status_code == 200
+    return False
 
 
 # ─────────────────────────────────────────
@@ -360,13 +415,15 @@ def run():
     print(f"Advanced EMA Strategy — {now} Dubai time")
     print(f"{'='*56}")
 
+    # Seed position state from trade log
+    load_positions_from_log()
+
     for symbol in SYMBOLS:
         print(f"\n--- {symbol} ---")
         try:
-            # Fetch both timeframes
             print(f"  Fetching 30m candles...")
             candles_30m = get_candles(symbol, days=1)
-            time.sleep(2)  # respect CoinGecko rate limit
+            time.sleep(2)
             print(f"  Fetching 4h candles...")
             candles_4h  = get_candles(symbol, days=14)
             time.sleep(2)
@@ -374,17 +431,15 @@ def run():
             current_price = candles_30m[-1]["close"]
             print(f"  Latest close: ${current_price:,.4f}")
 
-            # Calculate all indicators
             indicators = get_indicators(candles_30m, candles_4h)
             print(f"  30m → EMA9: {indicators['ema9_30m']} | EMA21: {indicators['ema21_30m']} | RSI7: {indicators['rsi7_30m']}")
             print(f"  4h  → Trend: {indicators['trend_4h']} | RSI7: {indicators['rsi7_4h']}")
             print(f"  Divergence: {indicators['divergence'] or 'none'}")
+            print(f"  [SAR] Current tracked position: {open_positions.get(symbol, 'None')}")
 
-            # Ask Claude
             signal = ask_claude(symbol, indicators)
             print(f"  Signal: {signal['signal']} | Confidence: {signal['confidence']}% | {signal.get('reasoning','')}")
 
-            # Fire webhook if confidence meets threshold
             webhook_fired = False
             if signal["signal"] in ("BUY", "SELL") and signal["confidence"] >= MIN_CONFIDENCE:
                 webhook_fired = fire_webhook(signal["signal"], current_price, symbol)

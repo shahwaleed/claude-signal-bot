@@ -7,6 +7,7 @@ Logic:
 - When price is above VWAP and EMA-9 > EMA-21 → strong uptrend → BUY
 - When price is below VWAP and EMA-9 < EMA-21 → strong downtrend → SELL
 - VWAP acts as dynamic support/resistance
+- SAR (Stop-and-Reverse): if opposite position is open, close it first then open new direction
 
 Note: CoinGecko OHLC doesn't include volume, so we approximate VWAP
 using typical price (high+low+close)/3 weighted by price range as proxy.
@@ -32,11 +33,42 @@ BOT_UUIDS = {
 }
 TICKER_MAP = {"BTCUSDT": "BTCUSDT", "ETHUSDT": "ETHUSDT", "SOLUSDT": "SOLUSDT", "XRPUSDT": "XRPUSDT"}
 COINGECKO_IDS = {"BTCUSDT": "bitcoin", "ETHUSDT": "ethereum", "SOLUSDT": "solana", "XRPUSDT": "ripple"}
-SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
-TAKE_PROFIT = 2.0
-STOP_LOSS = 3.0
+SYMBOLS        = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
+TAKE_PROFIT    = 2.0
+STOP_LOSS      = 3.0
 MIN_CONFIDENCE = 65
-LOG_FILE = "trade_log.csv"
+LOG_FILE       = "trade_log.csv"
+
+# ─────────────────────────────────────────
+# SAR: in-memory position tracker
+# Seeded from trade log at startup.
+# Values: "BUY" (long open), "SELL" (short open), or None
+# ─────────────────────────────────────────
+open_positions = {s: None for s in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]}
+
+
+def load_positions_from_log():
+    """Seed open_positions from the last fired signal per symbol in trade_log.csv."""
+    if not os.path.exists(LOG_FILE):
+        return
+    last = {}
+    try:
+        with open(LOG_FILE, "r") as f:
+            for line in f:
+                parts = line.strip().split(",")
+                if len(parts) < 5:
+                    continue
+                # columns: timestamp,symbol,price,signal,confidence,vwap,...,webhook_fired,...
+                symbol = parts[1]
+                signal = parts[3]
+                fired  = parts[11] if len(parts) > 11 else "False"
+                if symbol in open_positions and signal in ("BUY", "SELL") and fired == "True":
+                    last[symbol] = signal
+        for sym, sig in last.items():
+            open_positions[sym] = sig
+        print("  [SAR] Loaded positions from log:", open_positions)
+    except Exception as e:
+        print(f"  [SAR] Could not load positions from log: {e}")
 
 
 def get_candles(symbol, days=1):
@@ -62,7 +94,7 @@ def calculate_ema(closes, period):
 def calculate_rsi(closes, period=14):
     if len(closes) < period + 1:
         return 50.0
-    gains = [max(closes[i]-closes[i-1], 0) for i in range(1, len(closes))]
+    gains  = [max(closes[i]-closes[i-1], 0) for i in range(1, len(closes))]
     losses = [max(closes[i-1]-closes[i], 0) for i in range(1, len(closes))]
     avg_gain = sum(gains[-period:]) / period
     avg_loss = sum(losses[-period:]) / period
@@ -75,22 +107,24 @@ def calculate_vwap(candles):
     total_tp_w, total_w = 0, 0
     for c in candles:
         tp = (c["high"] + c["low"] + c["close"]) / 3
-        w = max(c["high"] - c["low"], 0.0001)
+        w  = max(c["high"] - c["low"], 0.0001)
         total_tp_w += tp * w
-        total_w += w
+        total_w    += w
     return round(total_tp_w / total_w if total_w > 0 else candles[-1]["close"], 4)
 
 
 def get_indicators(candles):
     closes = [c["close"] for c in candles]
-    price = closes[-1]
-    ema9 = calculate_ema(closes, 9)
-    ema21 = calculate_ema(closes, 21)
-    rsi14 = calculate_rsi(closes, 14)
-    vwap = calculate_vwap(candles)
-    return {"price": price, "vwap": vwap, "ema9": ema9, "ema21": ema21, "rsi14": rsi14,
-            "price_vs_vwap": round((price - vwap) / vwap * 100, 4),
-            "ema_spread": round((ema9 - ema21) / ema21 * 100, 4)}
+    price  = closes[-1]
+    ema9   = calculate_ema(closes, 9)
+    ema21  = calculate_ema(closes, 21)
+    rsi14  = calculate_rsi(closes, 14)
+    vwap   = calculate_vwap(candles)
+    return {
+        "price": price, "vwap": vwap, "ema9": ema9, "ema21": ema21, "rsi14": rsi14,
+        "price_vs_vwap": round((price - vwap) / vwap * 100, 4),
+        "ema_spread":    round((ema9 - ema21) / ema21 * 100, 4)
+    }
 
 
 SYSTEM_PROMPT = """You are a professional crypto trading signal engine using VWAP + EMA strategy.
@@ -112,11 +146,14 @@ def ask_claude(symbol, ind):
     msg = (f"Symbol: {symbol}\nPrice: {ind['price']}\nVWAP: {ind['vwap']}\n"
            f"vs VWAP: {ind['price_vs_vwap']}%\nEMA9: {ind['ema9']}\nEMA21: {ind['ema21']}\n"
            f"EMA spread: {ind['ema_spread']}%\nRSI-14: {ind['rsi14']}\nReturn signal as JSON.")
-    resp = requests.post("https://api.anthropic.com/v1/messages",
-                         headers={"Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY,
-                                  "anthropic-version": "2023-06-01"},
-                         json={"model": "claude-sonnet-4-6", "max_tokens": 200, "system": SYSTEM_PROMPT,
-                               "messages": [{"role": "user", "content": msg}]}, timeout=30)
+    resp = requests.post(
+        "https://api.anthropic.com/v1/messages",
+        headers={"Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY,
+                 "anthropic-version": "2023-06-01"},
+        json={"model": "claude-sonnet-4-6", "max_tokens": 200, "system": SYSTEM_PROMPT,
+              "messages": [{"role": "user", "content": msg}]},
+        timeout=30
+    )
     resp.raise_for_status()
     raw = resp.json()["content"][0]["text"].strip()
     if raw.startswith("```"):
@@ -125,36 +162,118 @@ def ask_claude(symbol, ind):
     return json.loads(raw.strip())
 
 
+# ─────────────────────────────────────────
+# SAR webhook logic
+# ─────────────────────────────────────────
+
+def send_close_webhook(symbol, current_price):
+    """Close the current open position at market price."""
+    current = open_positions.get(symbol)
+    if current is None:
+        return False
+    close_action = "exit_long" if current == "BUY" else "exit_short"
+    ticker  = TICKER_MAP.get(symbol, symbol)
+    now_iso = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    payload = {
+        "secret":        WEBHOOK_SECRET,
+        "max_lag":       "300",
+        "timestamp":     now_iso,
+        "trigger_price": str(current_price),
+        "tv_exchange":   "BINANCE",
+        "tv_instrument": ticker,
+        "action":        close_action,
+        "bot_uuid":      BOT_UUIDS[symbol],
+    }
+    response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
+    if response.status_code == 200:
+        print(f"  [SAR] Closed {current} position for {symbol} ({close_action})")
+        open_positions[symbol] = None
+        return True
+    else:
+        print(f"  [SAR] Close failed [{response.status_code}]: {response.text}")
+        return False
+
+
 def fire_webhook(signal_str, price, symbol):
-    action = "enter_long" if signal_str == "BUY" else "enter_short"
-    tp_pct = TAKE_PROFIT if signal_str == "BUY" else -TAKE_PROFIT
-    payload = {"secret": WEBHOOK_SECRET, "max_lag": "300",
-               "timestamp": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"),
-               "trigger_price": str(price), "tv_exchange": "BINANCE",
-               "tv_instrument": TICKER_MAP.get(symbol, symbol), "action": action,
-               "bot_uuid": BOT_UUIDS[symbol],
-               "take_profit": {"enabled": True, "steps": [{"order_type": "market",
-                               "price_percent": tp_pct, "volume_percent": 100}]},
-               "stop_loss": {"enabled": True, "order_type": "market", "trigger_price_percent": STOP_LOSS}}
+    """
+    SAR logic:
+    - Same direction already open → skip duplicate entry
+    - Opposite direction open → close first, wait 5s, then open new
+    - No position open → open directly
+    """
+    current = open_positions.get(symbol)
+
+    # Already in same direction
+    if current == signal_str:
+        print(f"  [SAR] Already in {signal_str} for {symbol} — skipping duplicate entry")
+        return False
+
+    # Opposite position — close first (Stop-and-Reverse)
+    if current is not None and current != signal_str:
+        print(f"  [SAR] Reversing {current} → {signal_str} for {symbol}")
+        closed = send_close_webhook(symbol, price)
+        if closed:
+            print(f"  [SAR] Waiting 5s before opening {signal_str}...")
+            time.sleep(5)
+        else:
+            print(f"  [SAR] Close failed — aborting reversal for {symbol}")
+            return False
+
+    # Open new position
+    action  = "enter_long" if signal_str == "BUY" else "enter_short"
+    ticker  = TICKER_MAP.get(symbol, symbol)
+    now_iso = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    tp_pct  = TAKE_PROFIT if signal_str == "BUY" else -TAKE_PROFIT
+    payload = {
+        "secret":        WEBHOOK_SECRET,
+        "max_lag":       "300",
+        "timestamp":     now_iso,
+        "trigger_price": str(price),
+        "tv_exchange":   "BINANCE",
+        "tv_instrument": ticker,
+        "action":        action,
+        "bot_uuid":      BOT_UUIDS[symbol],
+        "take_profit": {
+            "enabled": True,
+            "steps": [{"order_type": "market", "price_percent": tp_pct, "volume_percent": 100}]
+        },
+        "stop_loss": {
+            "enabled": True,
+            "order_type": "market",
+            "trigger_price_percent": STOP_LOSS
+        }
+    }
     r = requests.post(WEBHOOK_URL, json=payload, timeout=10)
-    print(f"  Webhook {action}: {'SUCCESS' if r.status_code==200 else f'FAILED [{r.status_code}]'} (TP:{tp_pct}%)")
-    return r.status_code == 200
+    if r.status_code == 200:
+        print(f"  Webhook {action}: SUCCESS (TP:{tp_pct}%)")
+        open_positions[symbol] = signal_str
+        return True
+    print(f"  Webhook {action}: {'RATE LIMITED' if r.status_code==429 else f'FAILED [{r.status_code}]'} {r.text}")
+    return False
 
 
 def log_result(symbol, signal, ind, fired):
     ts = datetime.now(tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
     header = not os.path.exists(LOG_FILE) or os.path.getsize(LOG_FILE) == 0
     with open(LOG_FILE, "a") as f:
-        if header: f.write("timestamp_dubai,symbol,price,signal,confidence,vwap,price_vs_vwap,ema9,ema21,ema_spread,rsi14,webhook_fired,reasoning\n")
-        f.write(f'{ts},{symbol},{ind["price"]},{signal["signal"]},{signal["confidence"]},'
-                f'{ind["vwap"]},{ind["price_vs_vwap"]},{ind["ema9"]},{ind["ema21"]},'
-                f'{ind["ema_spread"]},{ind["rsi14"]},{fired},"{signal.get("reasoning","").replace(chr(34),chr(39))}"\n')
+        if header:
+            f.write("timestamp_dubai,symbol,price,signal,confidence,vwap,price_vs_vwap,ema9,ema21,ema_spread,rsi14,webhook_fired,reasoning\n")
+        reasoning = signal.get("reasoning", "").replace('"', "'")
+        f.write(
+            f'{ts},{symbol},{ind["price"]},{signal["signal"]},{signal["confidence"]},'
+            f'{ind["vwap"]},{ind["price_vs_vwap"]},{ind["ema9"]},{ind["ema21"]},'
+            f'{ind["ema_spread"]},{ind["rsi14"]},{fired},"{reasoning}"\n'
+        )
     print(f"  [{ts} Dubai] {symbol} | {signal['signal']} | {signal['confidence']}% | vsVWAP:{ind['price_vs_vwap']}% | Fired:{fired}")
 
 
 def run():
     now = datetime.now(tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M")
     print(f"\n{'='*56}\nVWAP + EMA Strategy — {now} Dubai time\n{'='*56}")
+
+    # Seed position state from trade log
+    load_positions_from_log()
+
     for symbol in SYMBOLS:
         print(f"\n--- {symbol} ---")
         try:
@@ -162,10 +281,11 @@ def run():
             time.sleep(2)
             ind = get_indicators(candles)
             print(f"  Price: ${ind['price']:,.4f} | VWAP: {ind['vwap']} | vsVWAP: {ind['price_vs_vwap']}% | EMA spread: {ind['ema_spread']}% | RSI: {ind['rsi14']}")
+            print(f"  [SAR] Current tracked position: {open_positions.get(symbol, 'None')}")
             signal = ask_claude(symbol, ind)
             print(f"  Signal: {signal['signal']} | {signal['confidence']}% | {signal.get('reasoning','')}")
             fired = False
-            if signal["signal"] in ("BUY","SELL") and signal["confidence"] >= MIN_CONFIDENCE:
+            if signal["signal"] in ("BUY", "SELL") and signal["confidence"] >= MIN_CONFIDENCE:
                 fired = fire_webhook(signal["signal"], ind["price"], symbol)
             else:
                 print("  HOLD — no webhook fired.")
