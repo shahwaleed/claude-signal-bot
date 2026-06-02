@@ -1,8 +1,6 @@
 name: Claude Signal Bot
 
 on:
-  schedule:
-    - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
       strategy:
