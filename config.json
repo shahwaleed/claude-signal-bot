@@ -1,9 +1,9 @@
 {
-  "strategy": "rsi_divergence",
+  "strategy": "breakout",
   "secondary_strategy": "ema_basic",
   "confidence": 99,
-  "market_condition": "manual test — rsi_divergence end-to-end verification",
-  "reasoning": "Forced to rsi_divergence for end-to-end test.",
+  "market_condition": "manual test — breakout end-to-end verification",
+  "reasoning": "Forced to breakout for end-to-end test.",
   "key_signals": ["Manual test run"],
   "updated_at_dubai": "2026-06-02 manual"
 }
