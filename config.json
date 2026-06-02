@@ -1,15 +1,15 @@
 {
   "strategy": "rsi_divergence",
-  "secondary_strategy": "ema_advanced",
-  "confidence": 85,
+  "secondary_strategy": "ema_basic",
+  "confidence": 88,
   "market_condition": "oversold extremes across multiple assets",
-  "reasoning": "BTC RSI at 20.62 on 4h/daily and XRP at 28.57 with 30m readings below 30 across BTC/SOL/XRP signal deeply oversold conditions ripe for divergence-based reversal plays despite aligned bearish trends.",
+  "reasoning": "RSI is critically oversold (sub-30) across BTC, XRP, and approaching on SOL/ETH on multiple timeframes with all trends aligned bearish, signaling exhausted selling and high probability reversal setup.",
   "key_signals": [
-    "BTC 4h/daily RSI at 20.62 - extreme oversold territory",
-    "XRP 30m RSI at 25.0 and 4h at 28.57 indicating exhausted selling",
-    "SOL 30m RSI at 24.51 confirming broad market capitulation",
-    "All assets trending bearish but RSI divergence potential high at these levels",
-    "BB width expanding (BTC 5.57%, XRP 6.43%) suggesting volatility spike nearing exhaustion"
+    "BTC RSI 20.62 on 4h and daily \u2014 deeply oversold extreme",
+    "XRP RSI 28.57 on 4h/daily with 25.0 on 30m \u2014 multi-timeframe exhaustion",
+    "All four assets show aligned bearish trends suggesting capitulation phase near completion",
+    "BTC 7d range 11.07% with expanding BB width confirms volatility spike typical of bottoming",
+    "SOL and ETH RSI approaching oversold threshold on higher timeframes, confirming broad market exhaustion"
   ],
-  "updated_at_dubai": "2026-06-02 10:44:16"
+  "updated_at_dubai": "2026-06-02 11:40:56"
 }
