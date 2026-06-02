@@ -1,9 +1,9 @@
 {
-  "strategy": "bollinger",
+  "strategy": "ema_advanced",
   "secondary_strategy": "ema_basic",
   "confidence": 99,
-  "market_condition": "manual test — bollinger end-to-end verification",
-  "reasoning": "Forced to bollinger for end-to-end test. BTC RSI at 12.66 should trigger RSI override BUY.",
+  "market_condition": "manual test — ema_advanced end-to-end verification",
+  "reasoning": "Forced to ema_advanced for end-to-end test.",
   "key_signals": ["Manual test run"],
   "updated_at_dubai": "2026-06-02 manual"
 }
