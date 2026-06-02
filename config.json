@@ -1,13 +1,9 @@
 {
-  "strategy": "rsi_divergence",
+  "strategy": "vwap",
   "secondary_strategy": "ema_basic",
-  "confidence": 88,
-  "market_condition": "oversold extremes across multiple assets",
-  "reasoning": "RSI is critically oversold on 4h/daily across BTC (12.66), XRP (25), SOL (28.95), and ETH (33.54) with aligned bearish trends suggesting exhaustion and high probability reversal setup.",
-  "key_signals": [
-    "BTC 4h RSI at 12.66 - historically extreme oversold territory signaling trend exhaustion",
-    "XRP and SOL 4h RSI below 30 confirming broad market capitulation",
-    "All assets showing bearish alignment but RSI divergence potential at these extreme lows"
-  ],
-  "updated_at_dubai": "2026-06-02 18:01:22"
+  "confidence": 99,
+  "market_condition": "manual test — verify SOL and XRP shorts accepted after portfolio top-up",
+  "reasoning": "Forced vwap to test SOL and XRP short execution with updated demo balance.",
+  "key_signals": ["Manual test run"],
+  "updated_at_dubai": "2026-06-02 manual"
 }
