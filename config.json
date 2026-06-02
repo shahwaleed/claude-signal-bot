@@ -1,9 +1,9 @@
 {
-  "strategy": "ema_advanced",
+  "strategy": "vwap",
   "secondary_strategy": "ema_basic",
   "confidence": 99,
-  "market_condition": "manual test — ema_advanced end-to-end verification",
-  "reasoning": "Forced to ema_advanced for end-to-end test.",
+  "market_condition": "manual test — vwap end-to-end verification",
+  "reasoning": "Forced to vwap for end-to-end test.",
   "key_signals": ["Manual test run"],
   "updated_at_dubai": "2026-06-02 manual"
 }
