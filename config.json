@@ -1,9 +1,9 @@
 {
-  "strategy": "vwap",
+  "strategy": "rsi_divergence",
   "secondary_strategy": "ema_basic",
   "confidence": 99,
-  "market_condition": "manual test — vwap end-to-end verification",
-  "reasoning": "Forced to vwap for end-to-end test.",
+  "market_condition": "manual test — rsi_divergence end-to-end verification",
+  "reasoning": "Forced to rsi_divergence for end-to-end test.",
   "key_signals": ["Manual test run"],
   "updated_at_dubai": "2026-06-02 manual"
 }
