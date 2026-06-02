@@ -1,9 +1,13 @@
 {
-  "strategy": "breakout",
-  "secondary_strategy": "ema_basic",
-  "confidence": 99,
-  "market_condition": "manual test — breakout end-to-end verification",
-  "reasoning": "Forced to breakout for end-to-end test.",
-  "key_signals": ["Manual test run"],
-  "updated_at_dubai": "2026-06-02 manual"
+  "strategy": "bollinger",
+  "secondary_strategy": "ema_advanced",
+  "confidence": 88,
+  "market_condition": "oversold extremes across multiple assets",
+  "reasoning": "Restored to bollinger post-testing. BTC RSI at 12.66 — deeply oversold. Bollinger RSI override will fire BUY signals. Market analyzer will update on next scheduled run.",
+  "key_signals": [
+    "BTC RSI 12.66 — extreme oversold, bollinger RSI override active",
+    "SOL RSI 28.95 and XRP RSI 25.0 confirm broad market exhaustion",
+    "Restored after strategy verification testing"
+  ],
+  "updated_at_dubai": "2026-06-02 17:52:00"
 }
