@@ -1,13 +1,9 @@
 {
-  "strategy": "rsi_divergence",
-  "secondary_strategy": "ema_advanced",
-  "confidence": 88,
-  "market_condition": "oversold extremes across multiple assets",
-  "reasoning": "RSI is deeply oversold on 4h and daily timeframes across BTC (12.66), SOL (28.95), and XRP (25.0) with all trends aligned bearish, signaling exhausted selling and high probability reversal setup.",
-  "key_signals": [
-    "BTC 4h RSI at 12.66 and 1d RSI at 12.66 \u2014 extreme oversold territory rarely sustained",
-    "SOL 30m RSI 22.52 and XRP 4h RSI 25.0 confirm broad market exhaustion",
-    "All assets aligned bearish across all 3 timeframes suggesting capitulation rather than continuation"
-  ],
-  "updated_at_dubai": "2026-06-02 16:43:48"
+  "strategy": "bollinger",
+  "secondary_strategy": "ema_basic",
+  "confidence": 99,
+  "market_condition": "manual test — bollinger end-to-end verification",
+  "reasoning": "Forced to bollinger for end-to-end test. BTC RSI at 12.66 should trigger RSI override BUY.",
+  "key_signals": ["Manual test run"],
+  "updated_at_dubai": "2026-06-02 manual"
 }
