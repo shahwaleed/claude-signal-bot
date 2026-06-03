@@ -1,61 +1,37 @@
 """
 Strategy: Bollinger Band Mean Reversion
-Best for: Choppy, sideways, ranging markets (current June 2026 conditions)
+Best for: Choppy, sideways, ranging markets
 
 Logic:
-- Price touches/breaks lower Bollinger Band + RSI oversold → BUY (expect bounce to middle band)
-- Price touches/breaks upper Bollinger Band + RSI overbought → SELL (expect drop to middle band)
-- Take profit target = middle band (20-period SMA) — dynamic, not fixed %
-- Stop loss = 3% fixed
+- Price touches/breaks lower BB + RSI oversold → BUY
+- Price touches/breaks upper BB + RSI overbought → SELL
+- Take profit = middle band, Stop loss = 3%
 
-Indicators:
-- Bollinger Bands (20-period SMA ± 2 standard deviations)
-- RSI-14 (standard for mean reversion, less noisy than RSI-7)
-- Band width (squeeze detection — tight bands = explosive move coming)
-- %B (where price sits within the bands — 0=lower, 0.5=middle, 1=upper)
-
-CoinGecko OHLC valid days values: 1, 7, 14, 30, 90, 180, 365
-- days=1  → 30-min candles (~48 candles)
-- days=7  → 4-hour candles (~42 candles) ← used here for BB-20 + RSI-14
+CoinGecko OHLC: days=7 → 4h candles (~42) for BB-20 + RSI-14
 """
 
 import requests
 import json
 import re
+import csv
 import time
 import os
 import math
 from datetime import datetime, timezone, timedelta
 
 DUBAI_TZ = timezone(timedelta(hours=4))
-
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 COINGECKO_API_KEY = os.environ.get("COINGECKO_API_KEY", "")
-
 WEBHOOK_URL    = "https://api.3commas.io/signal_bots/webhooks"
 WEBHOOK_SECRET = "eyJhbGciOiJIUzI1NiJ9.eyJzaWduYWxzX3NvdXJjZV9pZCI6MTMwNTYyfQ.DnbuKVB9cslOFa5l1WtrKH1PFsvacsV0Vfkh_e3E_DY"
-
 BOT_UUIDS = {
     "BTCUSDT": "67d3e022-7414-4ef8-8b6c-3d5c56a09667",
     "ETHUSDT": "edac8b79-ac23-4af5-a6eb-666432a0cb57",
     "SOLUSDT": "3d72a934-50a2-4fd6-bbd2-0e678c841ef4",
     "XRPUSDT": "e798e648-fab5-4b94-82af-052228fa9ed1",
 }
-
-TICKER_MAP = {
-    "BTCUSDT": "BTCUSDT",
-    "ETHUSDT": "ETHUSDT",
-    "SOLUSDT": "SOLUSDT",
-    "XRPUSDT": "XRPUSDT",
-}
-
-COINGECKO_IDS = {
-    "BTCUSDT": "bitcoin",
-    "ETHUSDT": "ethereum",
-    "SOLUSDT": "solana",
-    "XRPUSDT": "ripple",
-}
-
+TICKER_MAP = {"BTCUSDT": "BTCUSDT", "ETHUSDT": "ETHUSDT", "SOLUSDT": "SOLUSDT", "XRPUSDT": "XRPUSDT"}
+COINGECKO_IDS = {"BTCUSDT": "bitcoin", "ETHUSDT": "ethereum", "SOLUSDT": "solana", "XRPUSDT": "ripple"}
 SYMBOLS        = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
 BB_PERIOD      = 20
 BB_STD         = 2.0
@@ -72,13 +48,9 @@ def get_candles(symbol, days=7):
     headers = {"x-cg-demo-api-key": COINGECKO_API_KEY} if COINGECKO_API_KEY else {}
     response = requests.get(url, params=params, headers=headers, timeout=15)
     response.raise_for_status()
-    raw = response.json()
-    candles = []
-    for c in raw:
-        ts = datetime.fromtimestamp(c[0] / 1000, tz=DUBAI_TZ)
-        candles.append({"time": ts.strftime("%Y-%m-%d %H:%M"), "open": float(c[1]),
-                        "high": float(c[2]), "low": float(c[3]), "close": float(c[4])})
-    return candles
+    return [{"time": datetime.fromtimestamp(c[0]/1000, tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M"),
+             "open": float(c[1]), "high": float(c[2]), "low": float(c[3]), "close": float(c[4])}
+            for c in response.json()]
 
 
 def calculate_bollinger_bands(closes, period=20, num_std=2.0):
@@ -100,19 +72,13 @@ def calculate_bollinger_bands(closes, period=20, num_std=2.0):
 def calculate_rsi(closes, period=14):
     if len(closes) < period + 1:
         return 50.0
-    gains, losses = [], []
-    for i in range(1, len(closes)):
-        change = closes[i] - closes[i - 1]
-        gains.append(max(change, 0))
-        losses.append(max(-change, 0))
+    gains = [max(closes[i]-closes[i-1], 0) for i in range(1, len(closes))]
+    losses = [max(closes[i-1]-closes[i], 0) for i in range(1, len(closes))]
     avg_gain = sum(gains[-period:]) / period
     avg_loss = sum(losses[-period:]) / period
-    if avg_loss == 0:
-        return 100.0
-    if avg_gain == 0:
-        return 1.0
-    rs = avg_gain / avg_loss
-    return round(100 - (100 / (1 + rs)), 2)
+    if avg_loss == 0: return 100.0
+    if avg_gain == 0: return 1.0
+    return round(100 - (100 / (1 + avg_gain / avg_loss)), 2)
 
 
 def get_indicators(candles):
@@ -129,23 +95,14 @@ def get_indicators(candles):
 
 
 def parse_claude_json(raw_text):
-    """
-    Robustly extract the first valid JSON object from Claude's response.
-    Handles: clean JSON, ```json fences, extra text before/after, multiple objects.
-    """
     raw_text = raw_text.strip()
-    # Strip markdown fences if present
     if raw_text.startswith("```"):
         parts = raw_text.split("```")
         raw_text = parts[1]
-        if raw_text.startswith("json"):
-            raw_text = raw_text[4:]
+        if raw_text.startswith("json"): raw_text = raw_text[4:]
         raw_text = raw_text.strip()
-    # Extract first {...} block — handles extra text after the JSON
     match = re.search(r'\{[^{}]*\}', raw_text, re.DOTALL)
-    if match:
-        return json.loads(match.group())
-    # Last resort: try parsing as-is
+    if match: return json.loads(match.group())
     return json.loads(raw_text)
 
 
@@ -153,115 +110,94 @@ SYSTEM_PROMPT = """You are a professional crypto trading signal engine using Bol
 Output ONLY a raw JSON object. No text, no markdown, no explanation.
 
 STRATEGY: Bollinger Band Mean Reversion
-Best for choppy, ranging markets. Price reverts to the mean (middle band) after stretching to extremes.
+Best for choppy, ranging markets. Price reverts to mean (middle band) after stretching to extremes.
 
-SIGNAL RULES:
+BUY conditions:
+- percent_b <= 0.05 AND RSI < 40: strong BUY
+- percent_b <= 0.15 AND RSI < 35: BUY
+- RSI < 25: override BUY (extremely oversold)
+- squeeze=true + percent_b < 0.2: anticipatory BUY
 
-BUY conditions (expect bounce up to middle band):
-- percent_b <= 0.05 (price at or below lower band) AND RSI < 40: strong BUY
-- percent_b <= 0.15 (price near lower band) AND RSI < 35: BUY
-- RSI < 25: override BUY (extremely oversold regardless of band position)
-- squeeze = true + percent_b < 0.2: anticipatory BUY (breakout likely upward if already near lower)
+SELL conditions:
+- percent_b >= 0.95 AND RSI > 60: strong SELL
+- percent_b >= 0.85 AND RSI > 65: SELL
+- RSI > 75: override SELL (extremely overbought)
 
-SELL conditions (expect drop down to middle band):
-- percent_b >= 0.95 (price at or above upper band) AND RSI > 60: strong SELL
-- percent_b >= 0.85 (price near upper band) AND RSI > 65: SELL
-- RSI > 75: override SELL (extremely overbought regardless of band position)
+HOLD: percent_b 0.2-0.8, RSI 35-65 with no band touch
 
-HOLD conditions:
-- percent_b between 0.2 and 0.8 (price in middle of bands) — no edge
-- RSI between 35 and 65 with no band touch — neutral
-- squeeze = true with price in middle — wait for breakout direction
+CONFIDENCE (start 50):
++25 band break (<=0.05 or >=0.95), +15 near band, +20 RSI<30 or >70, +10 RSI<40 or >60,
++10 squeeze, min 80 on override (RSI<25 or >75)
 
-CONFIDENCE SCORING (start at 50):
-- Price touching/breaking lower band (percent_b <= 0.05): +25
-- Price near lower band (percent_b <= 0.15): +15
-- Price touching/breaking upper band (percent_b >= 0.95): +25
-- Price near upper band (percent_b >= 0.85): +15
-- RSI below 30: +20 for BUY signal
-- RSI below 40: +10 for BUY signal
-- RSI above 70: +20 for SELL signal
-- RSI above 60: +10 for SELL signal
-- Squeeze detected: +10 (high volatility incoming)
-- Override condition (RSI < 25 or RSI > 75): set confidence to minimum 80
+take_profit_pct = distance to middle band. Min 0.5, Max 5.0.
 
-take_profit_pct should be the distance from current price to the middle band as a percentage.
-Minimum take_profit_pct: 0.5. Maximum: 5.0.
-
-Required output format:
-{"signal":"BUY","confidence":78,"take_profit_pct":1.2,"reasoning":"Price at lower band with RSI oversold, expecting mean reversion to middle band"}"""
+Output: {"signal":"BUY","confidence":78,"take_profit_pct":1.2,"reasoning":"Price at lower band with RSI oversold"}"""
 
 
 def ask_claude(symbol, indicators):
     msg = (f"Symbol: {symbol}\nCurrent price: {indicators['price']}\n"
            f"Upper Band: {indicators['upper']}\nMiddle Band (SMA-20): {indicators['middle']}\n"
            f"Lower Band: {indicators['lower']}\nBandwidth: {indicators['bandwidth']}%\n"
-           f"Percent-B: {indicators['percent_b']} (0=lower band, 0.5=middle, 1=upper band)\n"
-           f"RSI-14: {indicators['rsi']}\nSqueeze detected: {indicators['squeeze']}\n"
-           f"Distance from lower band: {indicators['dist_lower_pct']}%\n"
-           f"Distance from upper band: {indicators['dist_upper_pct']}%\n"
-           f"Apply Bollinger Band Mean Reversion rules and return your signal as JSON.")
-    payload = {"model": "claude-sonnet-4-6", "max_tokens": 200, "system": SYSTEM_PROMPT,
-               "messages": [{"role": "user", "content": msg}]}
-    headers = {"Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY,
-               "anthropic-version": "2023-06-01"}
+           f"Percent-B: {indicators['percent_b']} (0=lower, 0.5=middle, 1=upper)\n"
+           f"RSI-14: {indicators['rsi']}\nSqueeze: {indicators['squeeze']}\n"
+           f"Distance from lower: {indicators['dist_lower_pct']}%\n"
+           f"Distance from upper: {indicators['dist_upper_pct']}%\nReturn signal as JSON.")
     response = requests.post("https://api.anthropic.com/v1/messages",
-                             headers=headers, json=payload, timeout=30)
+                             headers={"Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY,
+                                      "anthropic-version": "2023-06-01"},
+                             json={"model": "claude-sonnet-4-6", "max_tokens": 200, "system": SYSTEM_PROMPT,
+                                   "messages": [{"role": "user", "content": msg}]}, timeout=30)
     response.raise_for_status()
-    raw_text = response.json()["content"][0]["text"]
-    return parse_claude_json(raw_text)
+    return parse_claude_json(response.json()["content"][0]["text"])
 
 
 def fire_webhook(signal_str, current_price, symbol, take_profit_pct):
     action = "enter_long" if signal_str == "BUY" else "enter_short"
-    ticker = TICKER_MAP.get(symbol, symbol)
-    now_iso = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
     tp_pct = take_profit_pct if signal_str == "BUY" else -take_profit_pct
-    payload = {
-        "secret": WEBHOOK_SECRET, "max_lag": "300", "timestamp": now_iso,
-        "trigger_price": str(current_price), "tv_exchange": "BINANCE",
-        "tv_instrument": ticker, "action": action, "bot_uuid": BOT_UUIDS[symbol],
-        "take_profit": {"enabled": True, "steps": [{"order_type": "market",
-                        "price_percent": tp_pct, "volume_percent": 100}]},
-        "stop_loss": {"enabled": True, "order_type": "market",
-                      "trigger_price_percent": STOP_LOSS}
-    }
-    response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
-    if response.status_code == 200:
+    payload = {"secret": WEBHOOK_SECRET, "max_lag": "300",
+               "timestamp": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"),
+               "trigger_price": str(current_price), "tv_exchange": "BINANCE",
+               "tv_instrument": TICKER_MAP.get(symbol, symbol), "action": action,
+               "bot_uuid": BOT_UUIDS[symbol],
+               "take_profit": {"enabled": True, "steps": [{"order_type": "market",
+                               "price_percent": tp_pct, "volume_percent": 100}]},
+               "stop_loss": {"enabled": True, "order_type": "market", "trigger_price_percent": STOP_LOSS}}
+    r = requests.post(WEBHOOK_URL, json=payload, timeout=10)
+    if r.status_code == 200:
         print(f"  Webhook {action}: SUCCESS (TP: {tp_pct}%, SL: -{STOP_LOSS}%)")
-    elif response.status_code == 429:
+    elif r.status_code == 429:
         print(f"  Webhook: RATE LIMITED (429)")
-    elif response.status_code == 418:
+    elif r.status_code == 418:
         print(f"  Webhook: BLOCKED (418)")
     else:
-        print(f"  Webhook: FAILED [{response.status_code}] {response.text}")
-    return response.status_code == 200
+        print(f"  Webhook: FAILED [{r.status_code}] {r.text}")
+    return r.status_code == 200
 
 
 def log_result(symbol, signal, indicators, fired):
     timestamp = datetime.now(tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
     write_header = not os.path.exists(LOG_FILE) or os.path.getsize(LOG_FILE) == 0
-    with open(LOG_FILE, "a") as f:
+    with open(LOG_FILE, "a", newline="") as f:
+        writer = csv.writer(f, quoting=csv.QUOTE_MINIMAL)
         if write_header:
-            f.write("timestamp_dubai,symbol,price,signal,confidence,"
-                    "upper_band,middle_band,lower_band,percent_b,"
-                    "bandwidth,squeeze,rsi14,take_profit_pct,webhook_fired,reasoning\n")
-        reasoning = signal.get("reasoning", "").replace('"', "'")
-        tp = signal.get("take_profit_pct", "")
-        f.write(f'{timestamp},{symbol},{indicators["price"]},{signal["signal"]},'
-                f'{signal["confidence"]},{indicators["upper"]},{indicators["middle"]},'
-                f'{indicators["lower"]},{indicators["percent_b"]},{indicators["bandwidth"]},'
-                f'{indicators["squeeze"]},{indicators["rsi"]},{tp},{fired},"{reasoning}"\n')
+            writer.writerow(["timestamp_dubai", "symbol", "price", "signal", "confidence",
+                             "upper_band", "middle_band", "lower_band", "percent_b",
+                             "bandwidth", "squeeze", "rsi14", "take_profit_pct",
+                             "webhook_fired", "reasoning"])
+        writer.writerow([timestamp, symbol, indicators["price"], signal["signal"],
+                         signal["confidence"], indicators["upper"], indicators["middle"],
+                         indicators["lower"], indicators["percent_b"], indicators["bandwidth"],
+                         indicators["squeeze"], indicators["rsi"],
+                         signal.get("take_profit_pct", ""), fired,
+                         signal.get("reasoning", "")])
     print(f"  [{timestamp} Dubai] {symbol} | {signal['signal']} | "
           f"Confidence: {signal['confidence']}% | %B: {indicators['percent_b']} | "
-          f"RSI: {indicators['rsi']} | TP: {tp}% | Fired: {fired}")
+          f"RSI: {indicators['rsi']} | TP: {signal.get('take_profit_pct','')}% | Fired: {fired}")
 
 
 def run():
     now = datetime.now(tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M")
-    print(f"\n{'='*58}")
-    print(f"Bollinger Band Mean Reversion — {now} Dubai time")
-    print(f"{'='*58}")
+    print(f"\n{'='*58}\nBollinger Band Mean Reversion — {now} Dubai time\n{'='*58}")
     for symbol in SYMBOLS:
         print(f"\n--- {symbol} ---")
         try:
@@ -283,10 +219,7 @@ def run():
             time.sleep(3)
         except Exception as e:
             print(f"  ERROR on {symbol}: {e}")
-            continue
-    print(f"\n{'='*58}")
-    print("Run complete.")
-    print(f"{'='*58}\n")
+    print(f"\n{'='*58}\nRun complete.\n{'='*58}\n")
 
 
 if __name__ == "__main__":

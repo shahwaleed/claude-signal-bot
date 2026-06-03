@@ -3,9 +3,8 @@ Strategy: RSI Divergence
 Best for: Catching reversals at market turning points
 
 Logic:
-- Bullish divergence: price makes lower low but RSI makes higher low → BUY
-- Bearish divergence: price makes higher high but RSI makes lower high → SELL
-- One of the most reliable reversal signals in technical analysis
+- Bullish divergence: price lower low, RSI higher low → BUY
+- Bearish divergence: price higher high, RSI lower high → SELL
 
 Valid CoinGecko days: 1, 7, 14, 30, 90, 180, 365
 """
@@ -13,6 +12,7 @@ Valid CoinGecko days: 1, 7, 14, 30, 90, 180, 365
 import requests
 import json
 import re
+import csv
 import time
 import os
 from datetime import datetime, timezone, timedelta
@@ -59,20 +59,17 @@ def calculate_rsi_series(closes, period=14):
         avg_loss = sum(losses[-period:]) / period
         if avg_loss == 0: rsi_values.append(100.0)
         elif avg_gain == 0: rsi_values.append(1.0)
-        else:
-            rs = avg_gain / avg_loss
-            rsi_values.append(round(100 - (100 / (1 + rs)), 2))
+        else: rsi_values.append(round(100 - (100 / (1 + avg_gain/avg_loss)), 2))
     return rsi_values
 
 
 def find_divergence(closes, rsi_series, lookback=10):
     if len(closes) < lookback or len(rsi_series) < lookback:
         return {"type": "none", "strength": 0, "details": "insufficient data"}
-    pw = closes[-lookback:]
-    rw = rsi_series[-lookback:]
+    pw = closes[-lookback:]; rw = rsi_series[-lookback:]
     cur_p, cur_r = pw[-1], rw[-1]
-    prev_low_p = min(pw[:-3]) if len(pw) > 3 else pw[0]
-    prev_low_r = min(rw[:-3]) if len(rw) > 3 else rw[0]
+    prev_low_p  = min(pw[:-3]) if len(pw) > 3 else pw[0]
+    prev_low_r  = min(rw[:-3]) if len(rw) > 3 else rw[0]
     prev_high_p = max(pw[:-3]) if len(pw) > 3 else pw[0]
     prev_high_r = max(rw[:-3]) if len(rw) > 3 else rw[0]
     if cur_p < prev_low_p and cur_r > prev_low_r:
@@ -118,14 +115,14 @@ def parse_claude_json(raw_text):
 
 
 SYSTEM_PROMPT = """You are a trading signal engine using RSI Divergence strategy.
-Output ONLY a raw JSON object.
+Output ONLY a raw JSON object. No text, no markdown, no explanation.
 
 BUY: divergence.type = bullish (price lower low, RSI higher low)
 SELL: divergence.type = bearish (price higher high, RSI lower high)
 HOLD: divergence.type = none OR strength < 20
 
 CONFIDENCE (start 50): +20 divergence detected, +10/+20/+25 by strength tier,
-+15 EMA trend confirms, +10 RSI extreme, HOLD if no divergence.
++15 EMA trend confirms, +10 RSI extreme. HOLD if no divergence.
 
 Output: {"signal":"BUY","confidence":78,"reasoning":"Bullish RSI divergence — selling exhausted"}"""
 
@@ -163,12 +160,16 @@ def fire_webhook(signal_str, price, symbol):
 def log_result(symbol, signal, ind, fired):
     ts = datetime.now(tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
     div = ind["divergence"]
-    header = not os.path.exists(LOG_FILE) or os.path.getsize(LOG_FILE) == 0
-    with open(LOG_FILE, "a") as f:
-        if header: f.write("timestamp_dubai,symbol,price,signal,confidence,rsi,div_type,div_strength,ema9,ema21,trend,webhook_fired,reasoning\n")
-        f.write(f'{ts},{symbol},{ind["price"]},{signal["signal"]},{signal["confidence"]},'
-                f'{ind["rsi"]},{div["type"]},{div["strength"]},{ind["ema9"]},{ind["ema21"]},'
-                f'{ind["trend"]},{fired},"{signal.get("reasoning","").replace(chr(34),chr(39))}"\n')
+    write_header = not os.path.exists(LOG_FILE) or os.path.getsize(LOG_FILE) == 0
+    with open(LOG_FILE, "a", newline="") as f:
+        writer = csv.writer(f, quoting=csv.QUOTE_MINIMAL)
+        if write_header:
+            writer.writerow(["timestamp_dubai", "symbol", "price", "signal", "confidence",
+                             "rsi", "div_type", "div_strength", "ema9", "ema21",
+                             "trend", "webhook_fired", "reasoning"])
+        writer.writerow([ts, symbol, ind["price"], signal["signal"], signal["confidence"],
+                         ind["rsi"], div["type"], div["strength"], ind["ema9"], ind["ema21"],
+                         ind["trend"], fired, signal.get("reasoning", "")])
     print(f"  [{ts} Dubai] {symbol} | {signal['signal']} | {signal['confidence']}% | Div:{div['type']}({div['strength']}) | Fired:{fired}")
 
 
@@ -188,7 +189,7 @@ def run():
             signal = ask_claude(symbol, ind)
             print(f"  Signal: {signal['signal']} | {signal['confidence']}% | {signal.get('reasoning','')}")
             fired = False
-            if signal["signal"] in ("BUY","SELL") and signal["confidence"] >= MIN_CONFIDENCE:
+            if signal["signal"] in ("BUY", "SELL") and signal["confidence"] >= MIN_CONFIDENCE:
                 fired = fire_webhook(signal["signal"], ind["price"], symbol)
             else:
                 print("  HOLD — no webhook fired.")
