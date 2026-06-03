@@ -1,24 +1,10 @@
 """
 Strategy: Breakout Momentum
 Best for: Markets in tight consolidation about to make a big move
-
-Logic:
-- Detect consolidation range using last 20 candles (excluding current)
-- When price breaks out of that range with momentum → BUY or SELL
-- ATR confirms volatility expansion relative to the range
-- BB width confirms squeeze before breakout
-
-Valid CoinGecko days: 1, 7, 14, 30, 90, 180, 365
-days=7 → 4h candles (~42 candles)
+Log file: trade_log_breakout.csv
 """
 
-import requests
-import json
-import re
-import csv
-import time
-import os
-import math
+import requests, json, re, csv, time, os, math
 from datetime import datetime, timezone, timedelta
 
 DUBAI_TZ = timezone(timedelta(hours=4))
@@ -32,21 +18,19 @@ BOT_UUIDS = {
     "SOLUSDT": "3d72a934-50a2-4fd6-bbd2-0e678c841ef4",
     "XRPUSDT": "e798e648-fab5-4b94-82af-052228fa9ed1",
 }
-TICKER_MAP = {"BTCUSDT": "BTCUSDT", "ETHUSDT": "ETHUSDT", "SOLUSDT": "SOLUSDT", "XRPUSDT": "XRPUSDT"}
+TICKER_MAP    = {"BTCUSDT": "BTCUSDT", "ETHUSDT": "ETHUSDT", "SOLUSDT": "SOLUSDT", "XRPUSDT": "XRPUSDT"}
 COINGECKO_IDS = {"BTCUSDT": "bitcoin", "ETHUSDT": "ethereum", "SOLUSDT": "solana", "XRPUSDT": "ripple"}
 SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
-TAKE_PROFIT = 3.0
-STOP_LOSS   = 2.0   # Widened from 2.5 to 2.0 for better R:R on breakouts
+TAKE_PROFIT    = 3.0
+STOP_LOSS      = 2.0
 MIN_CONFIDENCE = 65
-LOG_FILE = "trade_log.csv"
+LOG_FILE       = "trade_log_breakout.csv"   # strategy-specific log
 
 
 def get_candles(symbol, days=7):
-    coin_id = COINGECKO_IDS[symbol]
-    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc"
-    params = {"vs_currency": "usd", "days": str(days)}
+    url = f"https://api.coingecko.com/api/v3/coins/{COINGECKO_IDS[symbol]}/ohlc"
     headers = {"x-cg-demo-api-key": COINGECKO_API_KEY} if COINGECKO_API_KEY else {}
-    r = requests.get(url, params=params, headers=headers, timeout=15)
+    r = requests.get(url, params={"vs_currency": "usd", "days": str(days)}, headers=headers, timeout=15)
     r.raise_for_status()
     return [{"time": datetime.fromtimestamp(c[0]/1000, tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M"),
              "open": float(c[1]), "high": float(c[2]), "low": float(c[3]), "close": float(c[4])}
@@ -54,11 +38,11 @@ def get_candles(symbol, days=7):
 
 
 def calc_atr(candles, period=14):
-    trs = [max(candles[i]["high"] - candles[i]["low"],
-               abs(candles[i]["high"] - candles[i-1]["close"]),
-               abs(candles[i]["low"]  - candles[i-1]["close"]))
+    trs = [max(candles[i]["high"]-candles[i]["low"],
+               abs(candles[i]["high"]-candles[i-1]["close"]),
+               abs(candles[i]["low"]-candles[i-1]["close"]))
            for i in range(1, len(candles))]
-    return sum(trs[-period:]) / min(len(trs), period) if trs else 0
+    return sum(trs[-period:])/min(len(trs), period) if trs else 0
 
 
 def get_indicators(candles):
@@ -66,121 +50,99 @@ def get_indicators(candles):
     highs  = [c["high"]  for c in candles]
     lows   = [c["low"]   for c in candles]
     price  = closes[-1]
-
-    # Exclude the current (last) candle from consolidation range
-    # so a breakout can actually be detected against prior candles
-    lookback = min(20, len(candles) - 1)
-    prior_highs = highs[-lookback-1:-1]
-    prior_lows  = lows[-lookback-1:-1]
-    range_high = max(prior_highs) if prior_highs else highs[-1]
-    range_low  = min(prior_lows)  if prior_lows  else lows[-1]
-
-    range_pct    = round((range_high - range_low) / range_low * 100, 4) if range_low else 0
-    atr          = calc_atr(candles)
-    atr_pct      = round(atr / price * 100, 4) if price else 0
-    range_vs_atr = round(range_pct / atr_pct, 4) if atr_pct else 0
-
-    # BB width using prior candles (same window)
-    window = closes[-lookback-1:-1] if len(closes) > lookback else closes[:-1]
-    if len(window) >= 2:
-        m   = sum(window) / len(window)
-        std = math.sqrt(sum((x - m) ** 2 for x in window) / len(window))
-        bb_width = round((m + 2*std - (m - 2*std)) / m * 100, 4) if m else 5.0
+    lb     = min(20, len(candles)-1)
+    ph     = highs[-lb-1:-1]; pl = lows[-lb-1:-1]
+    rh     = max(ph) if ph else highs[-1]
+    rl     = min(pl) if pl else lows[-1]
+    rng    = round((rh-rl)/rl*100, 4) if rl else 0
+    a      = calc_atr(candles)
+    ap     = round(a/price*100, 4) if price else 0
+    rva    = round(rng/ap, 4) if ap else 0
+    win    = closes[-lb-1:-1] if len(closes) > lb else closes[:-1]
+    if len(win) >= 2:
+        m = sum(win)/len(win)
+        std = math.sqrt(sum((x-m)**2 for x in win)/len(win))
+        bbw = round((m+2*std-(m-2*std))/m*100, 4) if m else 5.0
     else:
-        bb_width = 5.0
-
-    breakout_up   = price > range_high * 1.003
-    breakout_down = price < range_low  * 0.997
-    bo_up_pct     = round((price - range_high) / range_high * 100, 4) if breakout_up   else 0
-    bo_down_pct   = round((range_low - price)  / range_low  * 100, 4) if breakout_down else 0
-
-    # Momentum: compare last close to 3 candles ago — guard against short lists
-    if len(closes) >= 4:
-        momentum = "up" if closes[-1] > closes[-4] else "down" if closes[-1] < closes[-4] else "flat"
-    elif len(closes) >= 2:
-        momentum = "up" if closes[-1] > closes[-2] else "down" if closes[-1] < closes[-2] else "flat"
-    else:
-        momentum = "flat"
-
-    return {"price": price, "range_high": range_high, "range_low": range_low,
-            "range_pct": range_pct, "atr_pct": atr_pct, "range_vs_atr": range_vs_atr,
-            "bb_width": bb_width, "breakout_up": breakout_up, "breakout_down": breakout_down,
-            "bo_up_pct": bo_up_pct, "bo_down_pct": bo_down_pct, "momentum": momentum}
+        bbw = 5.0
+    bu = price > rh*1.003; bd = price < rl*0.997
+    bup = round((price-rh)/rh*100, 4) if bu else 0
+    bdp = round((rl-price)/rl*100, 4) if bd else 0
+    if len(closes) >= 4:   mom = "up" if closes[-1]>closes[-4] else "down" if closes[-1]<closes[-4] else "flat"
+    elif len(closes) >= 2: mom = "up" if closes[-1]>closes[-2] else "down" if closes[-1]<closes[-2] else "flat"
+    else:                  mom = "flat"
+    return {"price": price, "range_high": rh, "range_low": rl, "range_pct": rng,
+            "atr_pct": ap, "range_vs_atr": rva, "bb_width": bbw,
+            "breakout_up": bu, "breakout_down": bd, "bo_up_pct": bup, "bo_down_pct": bdp, "momentum": mom}
 
 
-def parse_claude_json(raw_text):
-    raw_text = raw_text.strip()
-    if raw_text.startswith("```"):
-        parts = raw_text.split("```")
-        raw_text = parts[1]
-        if raw_text.startswith("json"): raw_text = raw_text[4:]
-        raw_text = raw_text.strip()
-    match = re.search(r'\{[^{}]*\}', raw_text, re.DOTALL)
-    if match: return json.loads(match.group())
-    return json.loads(raw_text)
+def parse_claude_json(raw):
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"): raw = raw[4:]
+        raw = raw.strip()
+    m = re.search(r'\{[^{}]*\}', raw, re.DOTALL)
+    if m: return json.loads(m.group())
+    return json.loads(raw)
 
 
 SYSTEM_PROMPT = """You are a trading signal engine using Breakout Momentum strategy.
-Output ONLY a raw JSON object. No text, no markdown, no explanation.
+Output ONLY a raw JSON object. No text, no markdown.
 
-BUY: breakout_up=True AND momentum=up AND range_vs_atr >= 0.8
-SELL: breakout_down=True AND momentum=down AND range_vs_atr >= 0.8
-HOLD: no confirmed breakout OR range_vs_atr < 0.8 (insufficient consolidation)
+BUY: breakout_up=True AND momentum=up AND range_vs_atr>=0.8
+SELL: breakout_down=True AND momentum=down AND range_vs_atr>=0.8
+HOLD: no confirmed breakout OR range_vs_atr<0.8
 
-CONFIDENCE (start 50):
-+20 confirmed breakout direction, +15 momentum confirms direction,
-+10 range_vs_atr >= 1.2 (well-consolidated range), +10 bb_width < 4% (tight squeeze),
--10 range_vs_atr < 0.8 (weak consolidation), -10 momentum conflicts with breakout
+CONFIDENCE (start 50): +20 breakout confirmed, +15 momentum confirms,
++10 range_vs_atr>=1.2, +10 bb_width<4%, -10 range_vs_atr<0.8, -10 momentum conflicts.
 
-Output: {"signal":"BUY","confidence":72,"reasoning":"Price broke above 20-candle consolidation high with upward momentum confirmed"}"""
+Output: {"signal":"BUY","confidence":72,"reasoning":"Price broke above consolidation high"}"""
 
 
 def ask_claude(symbol, ind):
     msg = (f"Symbol: {symbol}\nPrice: {ind['price']}\n"
-           f"Consolidation range (prior 20 candles): {ind['range_low']}-{ind['range_high']} ({ind['range_pct']}%)\n"
+           f"Range (prior 20): {ind['range_low']}-{ind['range_high']} ({ind['range_pct']}%)\n"
            f"ATR%: {ind['atr_pct']}% | RangeVsATR: {ind['range_vs_atr']}x | Momentum: {ind['momentum']}\n"
            f"Breakout up: {ind['breakout_up']}(+{ind['bo_up_pct']}%) | down: {ind['breakout_down']}(+{ind['bo_down_pct']}%)\n"
-           f"BB width (prior candles): {ind['bb_width']}%\nReturn signal as JSON.")
-    resp = requests.post("https://api.anthropic.com/v1/messages",
-                         headers={"Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY,
-                                  "anthropic-version": "2023-06-01"},
-                         json={"model": "claude-sonnet-4-6", "max_tokens": 200, "system": SYSTEM_PROMPT,
-                               "messages": [{"role": "user", "content": msg}]}, timeout=30)
-    resp.raise_for_status()
-    return parse_claude_json(resp.json()["content"][0]["text"])
+           f"BB width: {ind['bb_width']}%\nReturn JSON.")
+    r = requests.post("https://api.anthropic.com/v1/messages",
+                      headers={"Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01"},
+                      json={"model": "claude-sonnet-4-6", "max_tokens": 200, "system": SYSTEM_PROMPT,
+                            "messages": [{"role": "user", "content": msg}]}, timeout=30)
+    r.raise_for_status()
+    return parse_claude_json(r.json()["content"][0]["text"])
 
 
 def fire_webhook(signal_str, price, symbol):
     action = "enter_long" if signal_str == "BUY" else "enter_short"
-    tp_pct = TAKE_PROFIT if signal_str == "BUY" else -TAKE_PROFIT
+    tp = TAKE_PROFIT if signal_str == "BUY" else -TAKE_PROFIT
     payload = {"secret": WEBHOOK_SECRET, "max_lag": "300",
                "timestamp": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"),
                "trigger_price": str(price), "tv_exchange": "BINANCE",
                "tv_instrument": TICKER_MAP.get(symbol, symbol), "action": action,
                "bot_uuid": BOT_UUIDS[symbol],
-               "take_profit": {"enabled": True, "steps": [{"order_type": "market",
-                               "price_percent": tp_pct, "volume_percent": 100}]},
+               "take_profit": {"enabled": True, "steps": [{"order_type": "market", "price_percent": tp, "volume_percent": 100}]},
                "stop_loss": {"enabled": True, "order_type": "market", "trigger_price_percent": STOP_LOSS}}
     r = requests.post(WEBHOOK_URL, json=payload, timeout=10)
-    print(f"  Webhook {action}: {'SUCCESS' if r.status_code==200 else f'FAILED [{r.status_code}]'} (TP:{tp_pct}%, SL:-{STOP_LOSS}%)")
+    print(f"  Webhook {action}: {'SUCCESS' if r.status_code==200 else f'FAILED [{r.status_code}]'} (TP:{tp}%, SL:-{STOP_LOSS}%)")
     return r.status_code == 200
 
 
 def log_result(symbol, signal, ind, fired):
     ts = datetime.now(tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
-    write_header = not os.path.exists(LOG_FILE) or os.path.getsize(LOG_FILE) == 0
+    header = not os.path.exists(LOG_FILE) or os.path.getsize(LOG_FILE) == 0
     with open(LOG_FILE, "a", newline="") as f:
-        writer = csv.writer(f, quoting=csv.QUOTE_MINIMAL)
-        if write_header:
-            writer.writerow(["timestamp_dubai", "symbol", "price", "signal", "confidence",
-                             "range_pct", "atr_pct", "range_vs_atr", "bb_width",
-                             "bo_up_pct", "bo_down_pct", "momentum", "webhook_fired", "reasoning"])
-        writer.writerow([ts, symbol, ind["price"], signal["signal"], signal["confidence"],
-                         ind["range_pct"], ind["atr_pct"], ind["range_vs_atr"], ind["bb_width"],
-                         ind["bo_up_pct"], ind["bo_down_pct"], ind["momentum"], fired,
-                         signal.get("reasoning", "")])
-    print(f"  [{ts} Dubai] {symbol} | {signal['signal']} | {signal['confidence']}% | "
-          f"bo_up:{ind['breakout_up']}({ind['bo_up_pct']}%) | bo_down:{ind['breakout_down']}({ind['bo_down_pct']}%) | Fired:{fired}")
+        w = csv.writer(f, quoting=csv.QUOTE_MINIMAL)
+        if header:
+            w.writerow(["timestamp_dubai","symbol","price","signal","confidence",
+                        "range_pct","atr_pct","range_vs_atr","bb_width",
+                        "bo_up_pct","bo_down_pct","momentum","webhook_fired","reasoning"])
+        w.writerow([ts, symbol, ind["price"], signal["signal"], signal["confidence"],
+                    ind["range_pct"], ind["atr_pct"], ind["range_vs_atr"], ind["bb_width"],
+                    ind["bo_up_pct"], ind["bo_down_pct"], ind["momentum"], fired,
+                    signal.get("reasoning","")])
+    print(f"  [{ts}] {symbol} | {signal['signal']} | {signal['confidence']}% | bo_up:{ind['bo_up_pct']}% bo_down:{ind['bo_down_pct']}% | Fired:{fired}")
 
 
 def run():
@@ -189,16 +151,15 @@ def run():
     for symbol in SYMBOLS:
         print(f"\n--- {symbol} ---")
         try:
-            candles = get_candles(symbol, days=7)
-            time.sleep(2)
+            candles = get_candles(symbol, days=7); time.sleep(2)
             ind = get_indicators(candles)
             print(f"  Price: ${ind['price']:,.4f} | Range: {ind['range_low']}-{ind['range_high']} ({ind['range_pct']}%)")
-            print(f"  ATR%: {ind['atr_pct']}% | RangeVsATR: {ind['range_vs_atr']}x | Momentum: {ind['momentum']}")
-            print(f"  Breakout up: {ind['breakout_up']}(+{ind['bo_up_pct']}%) | down: {ind['breakout_down']}(+{ind['bo_down_pct']}%)")
+            print(f"  ATR%:{ind['atr_pct']}% RangeVsATR:{ind['range_vs_atr']}x Momentum:{ind['momentum']}")
+            print(f"  Breakout up:{ind['breakout_up']}(+{ind['bo_up_pct']}%) down:{ind['breakout_down']}(+{ind['bo_down_pct']}%)")
             signal = ask_claude(symbol, ind)
-            print(f"  Signal: {signal['signal']} | {signal['confidence']}% | {signal.get('reasoning','')}")
+            print(f"  Signal:{signal['signal']} Conf:{signal['confidence']}% | {signal.get('reasoning','')}")
             fired = False
-            if signal["signal"] in ("BUY", "SELL") and signal["confidence"] >= MIN_CONFIDENCE:
+            if signal["signal"] in ("BUY","SELL") and signal["confidence"] >= MIN_CONFIDENCE:
                 fired = fire_webhook(signal["signal"], ind["price"], symbol)
             else:
                 print("  HOLD — no webhook fired.")
