@@ -2,6 +2,12 @@
 Strategy: Bollinger Band Mean Reversion
 Best for: Choppy, sideways, ranging markets
 Log file: trade_log_bollinger.csv
+
+Fixes applied:
+  1. Flat market RSI returns 50.0 (neutral) not 100.0
+  2. clamp_tp(None) → 0.5 instead of crashing (Claude can return null)
+  3. percent_b defaults to 0.5 when <20 candles (never None to Claude)
+  4. Prompt: clarified override behaviour at band extremes
 """
 
 import requests, json, re, csv, time, os, math
@@ -18,15 +24,15 @@ BOT_UUIDS = {
     "SOLUSDT": "3d72a934-50a2-4fd6-bbd2-0e678c841ef4",
     "XRPUSDT": "e798e648-fab5-4b94-82af-052228fa9ed1",
 }
-TICKER_MAP     = {"BTCUSDT": "BTCUSDT", "ETHUSDT": "ETHUSDT", "SOLUSDT": "SOLUSDT", "XRPUSDT": "XRPUSDT"}
-COINGECKO_IDS  = {"BTCUSDT": "bitcoin", "ETHUSDT": "ethereum", "SOLUSDT": "solana", "XRPUSDT": "ripple"}
-SYMBOLS        = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
+TICKER_MAP    = {"BTCUSDT":"BTCUSDT","ETHUSDT":"ETHUSDT","SOLUSDT":"SOLUSDT","XRPUSDT":"XRPUSDT"}
+COINGECKO_IDS = {"BTCUSDT":"bitcoin","ETHUSDT":"ethereum","SOLUSDT":"solana","XRPUSDT":"ripple"}
+SYMBOLS        = ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT"]
 BB_PERIOD      = 20
 BB_STD         = 2.0
 RSI_PERIOD     = 14
 STOP_LOSS      = 3.0
 MIN_CONFIDENCE = 65
-LOG_FILE       = "trade_log_bollinger.csv"   # strategy-specific log
+LOG_FILE       = "trade_log_bollinger.csv"
 TP_MIN         = 0.5
 TP_MAX         = 5.0
 
@@ -34,10 +40,10 @@ TP_MAX         = 5.0
 def get_candles(symbol, days=7):
     url = f"https://api.coingecko.com/api/v3/coins/{COINGECKO_IDS[symbol]}/ohlc"
     headers = {"x-cg-demo-api-key": COINGECKO_API_KEY} if COINGECKO_API_KEY else {}
-    r = requests.get(url, params={"vs_currency": "usd", "days": str(days)}, headers=headers, timeout=15)
+    r = requests.get(url, params={"vs_currency":"usd","days":str(days)}, headers=headers, timeout=15)
     r.raise_for_status()
-    return [{"time": datetime.fromtimestamp(c[0]/1000, tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M"),
-             "open": float(c[1]), "high": float(c[2]), "low": float(c[3]), "close": float(c[4])}
+    return [{"time":datetime.fromtimestamp(c[0]/1000,tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M"),
+             "open":float(c[1]),"high":float(c[2]),"low":float(c[3]),"close":float(c[4])}
             for c in r.json()]
 
 
@@ -53,10 +59,17 @@ def calculate_bollinger_bands(closes, period=20, num_std=2.0):
 
 
 def calculate_rsi(closes, period=14):
+    """
+    RSI-14. Returns 50.0 on insufficient data.
+    FIX 1: flat market (ag=0 AND al=0) returns 50.0 (neutral), not 100.0.
+            Old code hit al==0 first and returned 100.0, which could trigger
+            a SELL override even in a perfectly consolidating market.
+    """
     if len(closes) < period+1: return 50.0
     g = [max(closes[i]-closes[i-1], 0) for i in range(1, len(closes))]
     l = [max(closes[i-1]-closes[i], 0) for i in range(1, len(closes))]
     ag, al = sum(g[-period:])/period, sum(l[-period:])/period
+    if ag==0 and al==0: return 50.0   # flat market → neutral
     if al == 0: return 100.0
     if ag == 0: return 1.0
     return round(100-(100/(1+ag/al)), 2)
@@ -70,8 +83,11 @@ def get_indicators(candles):
     squeeze = bw is not None and bw < 3.0
     dl = round((price-lower)/price*100, 2) if lower else 0
     du = round((upper-price)/price*100, 2) if upper else 0
+    # FIX 3: default percent_b to 0.5 when bands unavailable (<20 candles)
+    # Prevents Claude receiving "None" which it cannot interpret correctly
+    pb_safe = pb if pb is not None else 0.5
     return {"price": price, "upper": upper, "middle": middle, "lower": lower,
-            "bandwidth": bw, "percent_b": pb, "rsi": rsi, "squeeze": squeeze,
+            "bandwidth": bw, "percent_b": pb_safe, "rsi": rsi, "squeeze": squeeze,
             "dist_lower_pct": dl, "dist_upper_pct": du}
 
 
@@ -89,43 +105,73 @@ def parse_claude_json(raw):
 SYSTEM_PROMPT = """You are a crypto trading signal engine using Bollinger Band Mean Reversion.
 Output ONLY a raw JSON object. No text, no markdown.
 
-BUY: percent_b<=0.05 AND RSI<40 | percent_b<=0.15 AND RSI<35 | RSI<25 override
-SELL: percent_b>=0.95 AND RSI>60 | percent_b>=0.85 AND RSI>65 | RSI>75 override
-HOLD: percent_b 0.2-0.8, RSI 35-65
+STRATEGY: Price reverts to middle band (SMA-20) after stretching to extremes.
 
-CONFIDENCE (start 50): +25 band break, +15 near band, +20 RSI<30/>70, +10 RSI<40/>60, +10 squeeze, min 80 on override.
-take_profit_pct = distance to middle band. Min 0.5, Max 5.0. Never 0 or negative.
+BUY conditions (expect bounce up to middle band):
+- percent_b <= 0.05 AND RSI < 40: strong BUY (price broke below lower band)
+- percent_b <= 0.15 AND RSI < 35: BUY (price near lower band)
+- RSI < 25: override BUY (extremely oversold) — even if percent_b is neutral
+  NOTE: if price is simultaneously near the UPPER band (percent_b > 0.8) AND RSI < 25,
+  prefer BUY (oversold reading takes priority over band position in extreme cases)
 
-Output: {"signal":"BUY","confidence":78,"take_profit_pct":1.2,"reasoning":"Price at lower band"}"""
+SELL conditions (expect drop down to middle band):
+- percent_b >= 0.95 AND RSI > 60: strong SELL (price broke above upper band)
+- percent_b >= 0.85 AND RSI > 65: SELL (price near upper band)
+- RSI > 75: override SELL (extremely overbought) — even if percent_b is neutral
+  NOTE: if price is simultaneously near the LOWER band (percent_b < 0.2) AND RSI > 75,
+  prefer SELL (overbought reading takes priority over band position in extreme cases)
+
+HOLD: percent_b between 0.2-0.8 with RSI 35-65 and no clear band touch
+
+CONFIDENCE (start 50):
++25 band break (percent_b<=0.05 or >=0.95)
++15 near band (percent_b<=0.15 or >=0.85)
++20 RSI < 30 or > 70
++10 RSI < 40 or > 60
++10 squeeze=True (tight bands, high volatility incoming)
+Minimum 80 on RSI override (RSI<25 or RSI>75)
+
+take_profit_pct = % distance from current price to middle band.
+Must be a number between 0.5 and 5.0. Never return 0, negative, or null.
+
+Output: {"signal":"BUY","confidence":78,"take_profit_pct":1.2,"reasoning":"Price at lower band with RSI 22 — override BUY"}"""
 
 
 def ask_claude(symbol, ind):
-    msg = (f"Symbol: {symbol}\nPrice: {ind['price']}\nUpper: {ind['upper']}\nMiddle: {ind['middle']}\n"
-           f"Lower: {ind['lower']}\nBandwidth: {ind['bandwidth']}%\nPercent-B: {ind['percent_b']}\n"
+    msg = (f"Symbol: {symbol}\nPrice: {ind['price']}\nUpper: {ind['upper']}\n"
+           f"Middle: {ind['middle']}\nLower: {ind['lower']}\n"
+           f"Bandwidth: {ind['bandwidth']}%\nPercent-B: {ind['percent_b']} (0=lower,0.5=mid,1=upper)\n"
            f"RSI-14: {ind['rsi']}\nSqueeze: {ind['squeeze']}\n"
            f"Dist lower: {ind['dist_lower_pct']}%\nDist upper: {ind['dist_upper_pct']}%\nReturn JSON.")
     r = requests.post("https://api.anthropic.com/v1/messages",
-                      headers={"Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01"},
-                      json={"model": "claude-sonnet-4-6", "max_tokens": 200, "system": SYSTEM_PROMPT,
-                            "messages": [{"role": "user", "content": msg}]}, timeout=30)
+                      headers={"Content-Type":"application/json","x-api-key":ANTHROPIC_API_KEY,"anthropic-version":"2023-06-01"},
+                      json={"model":"claude-sonnet-4-6","max_tokens":200,"system":SYSTEM_PROMPT,
+                            "messages":[{"role":"user","content":msg}]},timeout=30)
     r.raise_for_status()
     return parse_claude_json(r.json()["content"][0]["text"])
 
 
 def fire_webhook(signal_str, price, symbol, take_profit_pct):
-    tp = round(max(TP_MIN, min(TP_MAX, float(take_profit_pct))), 2)
+    # FIX 2: handle None from Claude returning null, plus clamp to valid range
+    tp = clamp_tp(take_profit_pct)
     if signal_str == "SELL": tp = -tp
     action = "enter_long" if signal_str == "BUY" else "enter_short"
-    payload = {"secret": WEBHOOK_SECRET, "max_lag": "300",
-               "timestamp": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"),
-               "trigger_price": str(price), "tv_exchange": "BINANCE",
-               "tv_instrument": TICKER_MAP.get(symbol, symbol), "action": action,
-               "bot_uuid": BOT_UUIDS[symbol],
-               "take_profit": {"enabled": True, "steps": [{"order_type": "market", "price_percent": tp, "volume_percent": 100}]},
-               "stop_loss": {"enabled": True, "order_type": "market", "trigger_price_percent": STOP_LOSS}}
+    payload = {"secret":WEBHOOK_SECRET,"max_lag":"300",
+               "timestamp":datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"),
+               "trigger_price":str(price),"tv_exchange":"BINANCE",
+               "tv_instrument":TICKER_MAP.get(symbol,symbol),"action":action,
+               "bot_uuid":BOT_UUIDS[symbol],
+               "take_profit":{"enabled":True,"steps":[{"order_type":"market","price_percent":tp,"volume_percent":100}]},
+               "stop_loss":{"enabled":True,"order_type":"market","trigger_price_percent":STOP_LOSS}}
     r = requests.post(WEBHOOK_URL, json=payload, timeout=10)
     print(f"  Webhook {action}: {'SUCCESS' if r.status_code==200 else f'FAILED [{r.status_code}]'} (TP:{tp}%, SL:-{STOP_LOSS}%)")
     return r.status_code == 200
+
+
+def clamp_tp(v):
+    """Clamp take_profit_pct to valid range. Handles None, string, and out-of-range values."""
+    if v is None: return TP_MIN
+    return round(max(TP_MIN, min(TP_MAX, float(v))), 2)
 
 
 def log_result(symbol, signal, ind, fired):
