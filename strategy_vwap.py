@@ -38,16 +38,13 @@ LOG_FILE       = "trade_log.csv"
 
 open_positions = {s: None for s in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]}
 
-# Column index of webhook_fired in the VWAP trade log
+# Column index of webhook_fired in the VWAP trade log:
 # timestamp,symbol,price,signal,confidence,vwap,price_vs_vwap,ema9,ema21,ema_spread,rsi14,webhook_fired,reasoning
 FIRED_COL = 11
 
 
 def load_positions_from_log():
-    """
-    Seed open_positions from the last fired signal per symbol in trade_log.csv.
-    Uses csv module to correctly handle commas inside the quoted reasoning field.
-    """
+    """Seed open_positions from last fired signal per symbol."""
     if not os.path.exists(LOG_FILE):
         return
     last = {}
@@ -122,7 +119,6 @@ def get_indicators(candles):
 
 
 def parse_claude_json(raw_text):
-    """Robustly extract first valid JSON object from Claude's response."""
     raw_text = raw_text.strip()
     if raw_text.startswith("```"):
         parts = raw_text.split("```")
@@ -138,21 +134,39 @@ SYSTEM_PROMPT = """You are a professional crypto trading signal engine using VWA
 Output ONLY a raw JSON object. No text, no markdown, no explanation.
 
 STRATEGY: VWAP + EMA Trend Following
-BUY: price > VWAP AND EMA9 > EMA21 AND RSI < 65
-SELL: price < VWAP AND EMA9 < EMA21 AND RSI > 35
-HOLD: price near VWAP or EMAs very close
 
-CONFIDENCE (start 50):
-+20 price above/below VWAP correctly, +15 EMA confirms, +10 RSI confirms,
-+10 large deviation (>1%), +10 RSI extreme
+STEP 1 — MANDATORY HOLD CHECK (evaluate before anything else):
+If any of these are true → output HOLD immediately, confidence 50. Do not proceed to scoring.
+- price_vs_vwap > 0 (above VWAP) but EMA9 < EMA21 (bearish EMA) — signals disagree
+- price_vs_vwap < 0 (below VWAP) but EMA9 > EMA21 (bullish EMA) — signals disagree
+- |price_vs_vwap| < 0.3% AND |ema_spread| < 0.2% — price too close to VWAP and EMAs too close
 
-Output: {"signal":"BUY","confidence":75,"reasoning":"Price above VWAP with EMA-9 > EMA-21, confirmed uptrend"}"""
+STEP 2 — RSI FILTER (apply before scoring):
+- BUY signal: RSI >= 65 → HOLD (overbought, don't enter long)
+- SELL signal: RSI <= 35 → HOLD (oversold, don't enter short)
+
+STEP 3 — SIGNAL + CONFIDENCE SCORING:
+BUY:  price_vs_vwap > 0 AND ema_spread > 0 (both confirm bullish)
+SELL: price_vs_vwap < 0 AND ema_spread < 0 (both confirm bearish)
+
+Confidence (start 50):
++20  VWAP condition met (price on correct side)
++15  EMA confirms direction (ema_spread confirms)
++10  RSI in safe zone (RSI < 65 for BUY, RSI > 35 for SELL)
++10  Large deviation: |price_vs_vwap| > 1.0% (strong trend)
++10  RSI extreme: RSI < 30 for BUY (deeply oversold), RSI > 70 for SELL (deeply overbought)
+
+Cap confidence at 100.
+
+Output: {"signal":"BUY","confidence":85,"reasoning":"Price 1.5% above VWAP with EMA-9 > EMA-21 confirming uptrend, RSI not overbought"}"""
 
 
 def ask_claude(symbol, ind):
     msg = (f"Symbol: {symbol}\nPrice: {ind['price']}\nVWAP: {ind['vwap']}\n"
-           f"vs VWAP: {ind['price_vs_vwap']}%\nEMA9: {ind['ema9']}\nEMA21: {ind['ema21']}\n"
-           f"EMA spread: {ind['ema_spread']}%\nRSI-14: {ind['rsi14']}\nReturn signal as JSON.")
+           f"price_vs_vwap: {ind['price_vs_vwap']}%\n"
+           f"EMA9: {ind['ema9']}\nEMA21: {ind['ema21']}\n"
+           f"ema_spread: {ind['ema_spread']}%\nRSI-14: {ind['rsi14']}\n"
+           f"Return signal as JSON.")
     resp = requests.post("https://api.anthropic.com/v1/messages",
                          headers={"Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY,
                                   "anthropic-version": "2023-06-01"},
@@ -163,7 +177,6 @@ def ask_claude(symbol, ind):
 
 
 def send_close_webhook(symbol, current_price):
-    """Send exit signal to close current open position."""
     current = open_positions.get(symbol)
     if current is None: return False
     close_action = "exit_long" if current == "BUY" else "exit_short"
