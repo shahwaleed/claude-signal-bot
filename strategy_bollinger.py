@@ -21,6 +21,7 @@ CoinGecko OHLC valid days values: 1, 7, 14, 30, 90, 180, 365
 
 import requests
 import json
+import re
 import time
 import os
 import math
@@ -65,11 +66,6 @@ LOG_FILE       = "trade_log.csv"
 
 
 def get_candles(symbol, days=7):
-    """
-    Fetch OHLC from CoinGecko.
-    Valid days values: 1, 7, 14, 30, 90, 180, 365
-    days=7 returns 4-hour candles (~42 candles) — enough for BB-20 + RSI-14
-    """
     coin_id = COINGECKO_IDS[symbol]
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc"
     params = {"vs_currency": "usd", "days": str(days)}
@@ -132,6 +128,27 @@ def get_indicators(candles):
             "squeeze": squeeze, "dist_lower_pct": dist_from_lower, "dist_upper_pct": dist_from_upper}
 
 
+def parse_claude_json(raw_text):
+    """
+    Robustly extract the first valid JSON object from Claude's response.
+    Handles: clean JSON, ```json fences, extra text before/after, multiple objects.
+    """
+    raw_text = raw_text.strip()
+    # Strip markdown fences if present
+    if raw_text.startswith("```"):
+        parts = raw_text.split("```")
+        raw_text = parts[1]
+        if raw_text.startswith("json"):
+            raw_text = raw_text[4:]
+        raw_text = raw_text.strip()
+    # Extract first {...} block — handles extra text after the JSON
+    match = re.search(r'\{[^{}]*\}', raw_text, re.DOTALL)
+    if match:
+        return json.loads(match.group())
+    # Last resort: try parsing as-is
+    return json.loads(raw_text)
+
+
 SYSTEM_PROMPT = """You are a professional crypto trading signal engine using Bollinger Band Mean Reversion strategy.
 Output ONLY a raw JSON object. No text, no markdown, no explanation.
 
@@ -191,13 +208,8 @@ def ask_claude(symbol, indicators):
     response = requests.post("https://api.anthropic.com/v1/messages",
                              headers=headers, json=payload, timeout=30)
     response.raise_for_status()
-    raw_text = response.json()["content"][0]["text"].strip()
-    if raw_text.startswith("```"):
-        parts = raw_text.split("```")
-        raw_text = parts[1]
-        if raw_text.startswith("json"):
-            raw_text = raw_text[4:]
-    return json.loads(raw_text.strip())
+    raw_text = response.json()["content"][0]["text"]
+    return parse_claude_json(raw_text)
 
 
 def fire_webhook(signal_str, current_price, symbol, take_profit_pct):
