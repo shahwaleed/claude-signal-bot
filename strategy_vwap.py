@@ -3,19 +3,15 @@ Strategy: VWAP + EMA Trend Following
 Best for: Trending markets with institutional participation
 
 Logic:
-- VWAP (Volume Weighted Average Price) is the benchmark institutional traders use
-- When price is above VWAP and EMA-9 > EMA-21 → strong uptrend → BUY
-- When price is below VWAP and EMA-9 < EMA-21 → strong downtrend → SELL
 - VWAP acts as dynamic support/resistance
-- SAR (Stop-and-Reverse): if opposite position is open, close it first then open new direction
-
-Note: CoinGecko OHLC doesn't include volume, so we approximate VWAP
-using typical price (high+low+close)/3 weighted by price range as proxy.
-Valid CoinGecko days values: 1, 7, 14, 30, 90, 180, 365
+- Price above VWAP + EMA9 > EMA21 → BUY
+- Price below VWAP + EMA9 < EMA21 → SELL
+- SAR: close opposite position before opening new one
 """
 
 import requests
 import json
+import re
 import time
 import os
 from datetime import datetime, timezone, timedelta
@@ -39,16 +35,10 @@ STOP_LOSS      = 3.0
 MIN_CONFIDENCE = 65
 LOG_FILE       = "trade_log.csv"
 
-# ─────────────────────────────────────────
-# SAR: in-memory position tracker
-# Seeded from trade log at startup.
-# Values: "BUY" (long open), "SELL" (short open), or None
-# ─────────────────────────────────────────
 open_positions = {s: None for s in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]}
 
 
 def load_positions_from_log():
-    """Seed open_positions from the last fired signal per symbol in trade_log.csv."""
     if not os.path.exists(LOG_FILE):
         return
     last = {}
@@ -56,16 +46,12 @@ def load_positions_from_log():
         with open(LOG_FILE, "r") as f:
             for line in f:
                 parts = line.strip().split(",")
-                if len(parts) < 5:
-                    continue
-                # columns: timestamp,symbol,price,signal,confidence,vwap,...,webhook_fired,...
-                symbol = parts[1]
-                signal = parts[3]
+                if len(parts) < 5: continue
+                symbol = parts[1]; signal = parts[3]
                 fired  = parts[11] if len(parts) > 11 else "False"
                 if symbol in open_positions and signal in ("BUY", "SELL") and fired == "True":
                     last[symbol] = signal
-        for sym, sig in last.items():
-            open_positions[sym] = sig
+        for sym, sig in last.items(): open_positions[sym] = sig
         print("  [SAR] Loaded positions from log:", open_positions)
     except Exception as e:
         print(f"  [SAR] Could not load positions from log: {e}")
@@ -76,31 +62,29 @@ def get_candles(symbol, days=1):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc"
     params = {"vs_currency": "usd", "days": str(days)}
     headers = {"x-cg-demo-api-key": COINGECKO_API_KEY} if COINGECKO_API_KEY else {}
-    response = requests.get(url, params=params, headers=headers, timeout=15)
-    response.raise_for_status()
+    r = requests.get(url, params=params, headers=headers, timeout=15)
+    r.raise_for_status()
     return [{"time": datetime.fromtimestamp(c[0]/1000, tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M"),
              "open": float(c[1]), "high": float(c[2]), "low": float(c[3]), "close": float(c[4])}
-            for c in response.json()]
+            for c in r.json()]
 
 
 def calculate_ema(closes, period):
     k = 2 / (period + 1)
     ema = sum(closes[:period]) / period
-    for price in closes[period:]:
-        ema = price * k + ema * (1 - k)
+    for price in closes[period:]: ema = price * k + ema * (1 - k)
     return round(ema, 4)
 
 
 def calculate_rsi(closes, period=14):
-    if len(closes) < period + 1:
-        return 50.0
+    if len(closes) < period + 1: return 50.0
     gains  = [max(closes[i]-closes[i-1], 0) for i in range(1, len(closes))]
     losses = [max(closes[i-1]-closes[i], 0) for i in range(1, len(closes))]
-    avg_gain = sum(gains[-period:]) / period
-    avg_loss = sum(losses[-period:]) / period
-    if avg_loss == 0: return 100.0
-    if avg_gain == 0: return 1.0
-    return round(100 - (100 / (1 + avg_gain/avg_loss)), 2)
+    ag = sum(gains[-period:]) / period
+    al = sum(losses[-period:]) / period
+    if al == 0: return 100.0
+    if ag == 0: return 1.0
+    return round(100 - (100 / (1 + ag/al)), 2)
 
 
 def calculate_vwap(candles):
@@ -120,11 +104,22 @@ def get_indicators(candles):
     ema21  = calculate_ema(closes, 21)
     rsi14  = calculate_rsi(closes, 14)
     vwap   = calculate_vwap(candles)
-    return {
-        "price": price, "vwap": vwap, "ema9": ema9, "ema21": ema21, "rsi14": rsi14,
-        "price_vs_vwap": round((price - vwap) / vwap * 100, 4),
-        "ema_spread":    round((ema9 - ema21) / ema21 * 100, 4)
-    }
+    return {"price": price, "vwap": vwap, "ema9": ema9, "ema21": ema21, "rsi14": rsi14,
+            "price_vs_vwap": round((price - vwap) / vwap * 100, 4),
+            "ema_spread":    round((ema9 - ema21) / ema21 * 100, 4)}
+
+
+def parse_claude_json(raw_text):
+    """Robustly extract first valid JSON object from Claude's response."""
+    raw_text = raw_text.strip()
+    if raw_text.startswith("```"):
+        parts = raw_text.split("```")
+        raw_text = parts[1]
+        if raw_text.startswith("json"): raw_text = raw_text[4:]
+        raw_text = raw_text.strip()
+    match = re.search(r'\{[^{}]*\}', raw_text, re.DOTALL)
+    if match: return json.loads(match.group())
+    return json.loads(raw_text)
 
 
 SYSTEM_PROMPT = """You are a professional crypto trading signal engine using VWAP + EMA strategy.
@@ -146,103 +141,56 @@ def ask_claude(symbol, ind):
     msg = (f"Symbol: {symbol}\nPrice: {ind['price']}\nVWAP: {ind['vwap']}\n"
            f"vs VWAP: {ind['price_vs_vwap']}%\nEMA9: {ind['ema9']}\nEMA21: {ind['ema21']}\n"
            f"EMA spread: {ind['ema_spread']}%\nRSI-14: {ind['rsi14']}\nReturn signal as JSON.")
-    resp = requests.post(
-        "https://api.anthropic.com/v1/messages",
-        headers={"Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY,
-                 "anthropic-version": "2023-06-01"},
-        json={"model": "claude-sonnet-4-6", "max_tokens": 200, "system": SYSTEM_PROMPT,
-              "messages": [{"role": "user", "content": msg}]},
-        timeout=30
-    )
+    resp = requests.post("https://api.anthropic.com/v1/messages",
+                         headers={"Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY,
+                                  "anthropic-version": "2023-06-01"},
+                         json={"model": "claude-sonnet-4-6", "max_tokens": 200, "system": SYSTEM_PROMPT,
+                               "messages": [{"role": "user", "content": msg}]}, timeout=30)
     resp.raise_for_status()
-    raw = resp.json()["content"][0]["text"].strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"): raw = raw[4:]
-    return json.loads(raw.strip())
+    return parse_claude_json(resp.json()["content"][0]["text"])
 
-
-# ─────────────────────────────────────────
-# SAR webhook logic
-# ─────────────────────────────────────────
 
 def send_close_webhook(symbol, current_price):
-    """Close the current open position at market price."""
     current = open_positions.get(symbol)
-    if current is None:
-        return False
+    if current is None: return False
     close_action = "exit_long" if current == "BUY" else "exit_short"
-    ticker  = TICKER_MAP.get(symbol, symbol)
-    now_iso = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
-    payload = {
-        "secret":        WEBHOOK_SECRET,
-        "max_lag":       "300",
-        "timestamp":     now_iso,
-        "trigger_price": str(current_price),
-        "tv_exchange":   "BINANCE",
-        "tv_instrument": ticker,
-        "action":        close_action,
-        "bot_uuid":      BOT_UUIDS[symbol],
-    }
-    response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
-    if response.status_code == 200:
+    payload = {"secret": WEBHOOK_SECRET, "max_lag": "300",
+               "timestamp": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"),
+               "trigger_price": str(current_price), "tv_exchange": "BINANCE",
+               "tv_instrument": TICKER_MAP.get(symbol, symbol), "action": close_action,
+               "bot_uuid": BOT_UUIDS[symbol]}
+    r = requests.post(WEBHOOK_URL, json=payload, timeout=10)
+    if r.status_code == 200:
         print(f"  [SAR] Closed {current} position for {symbol} ({close_action})")
         open_positions[symbol] = None
         return True
-    else:
-        print(f"  [SAR] Close failed [{response.status_code}]: {response.text}")
-        return False
+    print(f"  [SAR] Close failed [{r.status_code}]: {r.text}")
+    return False
 
 
 def fire_webhook(signal_str, price, symbol):
-    """
-    SAR logic:
-    - Same direction already open → skip duplicate entry
-    - Opposite direction open → close first, wait 5s, then open new
-    - No position open → open directly
-    """
     current = open_positions.get(symbol)
-
-    # Already in same direction
     if current == signal_str:
-        print(f"  [SAR] Already in {signal_str} for {symbol} — skipping duplicate entry")
+        print(f"  [SAR] Already in {signal_str} for {symbol} — skipping")
         return False
-
-    # Opposite position — close first (Stop-and-Reverse)
     if current is not None and current != signal_str:
         print(f"  [SAR] Reversing {current} → {signal_str} for {symbol}")
-        closed = send_close_webhook(symbol, price)
-        if closed:
+        if send_close_webhook(symbol, price):
             print(f"  [SAR] Waiting 5s before opening {signal_str}...")
             time.sleep(5)
         else:
             print(f"  [SAR] Close failed — aborting reversal for {symbol}")
             return False
-
-    # Open new position
     action  = "enter_long" if signal_str == "BUY" else "enter_short"
-    ticker  = TICKER_MAP.get(symbol, symbol)
-    now_iso = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
     tp_pct  = TAKE_PROFIT if signal_str == "BUY" else -TAKE_PROFIT
-    payload = {
-        "secret":        WEBHOOK_SECRET,
-        "max_lag":       "300",
-        "timestamp":     now_iso,
-        "trigger_price": str(price),
-        "tv_exchange":   "BINANCE",
-        "tv_instrument": ticker,
-        "action":        action,
-        "bot_uuid":      BOT_UUIDS[symbol],
-        "take_profit": {
-            "enabled": True,
-            "steps": [{"order_type": "market", "price_percent": tp_pct, "volume_percent": 100}]
-        },
-        "stop_loss": {
-            "enabled": True,
-            "order_type": "market",
-            "trigger_price_percent": STOP_LOSS
-        }
-    }
+    payload = {"secret": WEBHOOK_SECRET, "max_lag": "300",
+               "timestamp": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"),
+               "trigger_price": str(price), "tv_exchange": "BINANCE",
+               "tv_instrument": TICKER_MAP.get(symbol, symbol), "action": action,
+               "bot_uuid": BOT_UUIDS[symbol],
+               "take_profit": {"enabled": True, "steps": [{"order_type": "market",
+                               "price_percent": tp_pct, "volume_percent": 100}]},
+               "stop_loss": {"enabled": True, "order_type": "market", "trigger_price_percent": STOP_LOSS}}
     r = requests.post(WEBHOOK_URL, json=payload, timeout=10)
     if r.status_code == 200:
         print(f"  Webhook {action}: SUCCESS (TP:{tp_pct}%)")
@@ -259,21 +207,16 @@ def log_result(symbol, signal, ind, fired):
         if header:
             f.write("timestamp_dubai,symbol,price,signal,confidence,vwap,price_vs_vwap,ema9,ema21,ema_spread,rsi14,webhook_fired,reasoning\n")
         reasoning = signal.get("reasoning", "").replace('"', "'")
-        f.write(
-            f'{ts},{symbol},{ind["price"]},{signal["signal"]},{signal["confidence"]},'
-            f'{ind["vwap"]},{ind["price_vs_vwap"]},{ind["ema9"]},{ind["ema21"]},'
-            f'{ind["ema_spread"]},{ind["rsi14"]},{fired},"{reasoning}"\n'
-        )
+        f.write(f'{ts},{symbol},{ind["price"]},{signal["signal"]},{signal["confidence"]},'
+                f'{ind["vwap"]},{ind["price_vs_vwap"]},{ind["ema9"]},{ind["ema21"]},'
+                f'{ind["ema_spread"]},{ind["rsi14"]},{fired},"{reasoning}"\n')
     print(f"  [{ts} Dubai] {symbol} | {signal['signal']} | {signal['confidence']}% | vsVWAP:{ind['price_vs_vwap']}% | Fired:{fired}")
 
 
 def run():
     now = datetime.now(tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M")
     print(f"\n{'='*56}\nVWAP + EMA Strategy — {now} Dubai time\n{'='*56}")
-
-    # Seed position state from trade log
     load_positions_from_log()
-
     for symbol in SYMBOLS:
         print(f"\n--- {symbol} ---")
         try:
