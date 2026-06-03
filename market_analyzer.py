@@ -2,14 +2,12 @@
 Autonomous Market Analyzer
 Runs 4x daily aligned to professional trading session opens (Dubai time):
   6:00 AM  — before Asia close
-  10:30 AM — before London open
-  3:30 PM  — before NY open (most important)
-  11:00 PM — end of NY session
+  12:00 PM — midday
+  6:00 PM  — before NY open
+  12:00 AM — end of NY session
 
 Architecture:
-  Instead of modifying workflow files (blocked by GitHub security),
-  writes chosen strategy to config.json which signal_bot.yml reads at runtime.
-  This uses only GITHUB_TOKEN with contents:write — no PAT needed.
+  Writes chosen strategy to config.json which signal_bot.yml reads at runtime.
 """
 
 import requests
@@ -24,7 +22,7 @@ COINGECKO_API_KEY = os.environ.get("COINGECKO_API_KEY", "")
 GITHUB_TOKEN      = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_OWNER      = "shahwaleed"
 GITHUB_REPO       = "claude-signal-bot"
-CONFIG_PATH       = "config.json"  # signal bot reads this
+CONFIG_PATH       = "config.json"
 
 COINGECKO_IDS = {"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana", "XRP": "ripple"}
 STRATEGIES    = ["bollinger", "ema_advanced", "vwap", "rsi_divergence", "breakout", "ema_basic"]
@@ -82,6 +80,35 @@ def calc_atr_pct(candles, p=14):
     return round(a / cur * 100, 4) if cur > 0 else 2.0
 
 
+def detect_rsi_divergence(candles_30m):
+    """
+    Check if bullish RSI divergence is forming:
+    Price making lower lows while RSI makes higher lows.
+    Returns True only if pattern is confirmed, not just oversold.
+    """
+    if len(candles_30m) < 20:
+        return False
+    closes = [c[4] for c in candles_30m]
+    # Calculate RSI series
+    rsi_series = []
+    for i in range(15, len(closes)):
+        rsi_series.append(calc_rsi(closes[:i], 14))
+
+    if len(rsi_series) < 10:
+        return False
+
+    # Look for: recent price lower than 10 candles ago, but RSI higher
+    recent_price = closes[-1]
+    past_price   = min(closes[-10:-1])
+    recent_rsi   = rsi_series[-1]
+    past_rsi     = min(rsi_series[-10:-1]) if len(rsi_series) >= 10 else rsi_series[0]
+
+    price_lower_low = recent_price < past_price
+    rsi_higher_low  = recent_rsi > past_rsi
+
+    return price_lower_low and rsi_higher_low
+
+
 def analyze_market():
     import time
     data = {}
@@ -99,18 +126,28 @@ def analyze_market():
             t1d = "bullish" if calc_ema(cl1d, 9) > calc_ema(cl1d, 21) else "bearish"
             h7d = max(c[2] for c in c4h)
             l7d = min(c[3] for c in c4h)
+
+            rsi_30m = calc_rsi(cl30)
+            rsi_4h  = calc_rsi(cl4h)
+            rsi_1d  = calc_rsi(cl1d)
+
+            # Key addition: actually check if divergence is forming
+            divergence_forming = detect_rsi_divergence(c30m)
+
             data[sym] = {
-                "price":        cl30[-1],
-                "change_24h":   round((cl30[-1] - cl30[0]) / cl30[0] * 100, 2) if cl30[0] else 0,
-                "change_7d":    round((cl4h[-1] - cl4h[0]) / cl4h[0] * 100, 2) if cl4h[0] else 0,
-                "trend_30m":    t30, "trend_4h": t4h, "trend_1d": t1d,
-                "aligned":      t30 == t4h == t1d,
-                "rsi_30m":      calc_rsi(cl30),
-                "rsi_4h":       calc_rsi(cl4h),
-                "rsi_1d":       calc_rsi(cl1d),
-                "bb_width_4h":  calc_bb_width(cl4h),
-                "atr_pct_4h":   calc_atr_pct(c4h),
-                "range_7d_pct": round((h7d - l7d) / l7d * 100, 2) if l7d else 0,
+                "price":              cl30[-1],
+                "change_24h":         round((cl30[-1] - cl30[0]) / cl30[0] * 100, 2) if cl30[0] else 0,
+                "change_7d":          round((cl4h[-1] - cl4h[0]) / cl4h[0] * 100, 2) if cl4h[0] else 0,
+                "trend_30m":          t30, "trend_4h": t4h, "trend_1d": t1d,
+                "aligned":            t30 == t4h == t1d,
+                "rsi_30m":            rsi_30m,
+                "rsi_4h":             rsi_4h,
+                "rsi_1d":             rsi_1d,
+                "bb_width_4h":        calc_bb_width(cl4h),
+                "atr_pct_4h":         calc_atr_pct(c4h),
+                "range_7d_pct":       round((h7d - l7d) / l7d * 100, 2) if l7d else 0,
+                "divergence_forming": divergence_forming,
+                "crash_mode":         rsi_30m < 20 and rsi_4h < 30 and not divergence_forming,
             }
         except Exception as e:
             print(f"  ERROR {sym}: {e}")
@@ -124,23 +161,38 @@ def analyze_market():
 ANALYSIS_PROMPT = """You are an expert crypto market analyst. Analyze market conditions and recommend the best trading strategy.
 Output ONLY a raw JSON object. No text, no markdown, no explanation.
 
-Available strategies and when to use them:
-- bollinger: choppy/ranging market, BB width < 4%, 7d range < 8%, trends NOT aligned across timeframes
-- ema_advanced: clear trending market, trends aligned 30m+4h+daily, RSI 40-65, ATR expanding
-- vwap: strong institutional trend, price consistently above/below VWAP, high volume sessions
-- rsi_divergence: market at extremes (RSI < 30 or > 70 on 4h/daily), potential reversal, exhausted trend
-- breakout: tight consolidation, BB width < 3% (squeeze), low ATR, big move expected soon
-- ema_basic: simple trend, use as fallback only
+Available strategies and PRECISE conditions for each:
 
-Decision framework:
-1. Are trends aligned across all 3 timeframes? Yes = trending strategy (ema_advanced/vwap)
-2. Is BB width < 3%? Yes = breakout imminent
-3. Is RSI extreme (< 30 or > 70) on multiple timeframes? Yes = rsi_divergence
-4. Is 7d range < 8% with misaligned trends? Yes = bollinger
-5. Is there a clear trend with moderate RSI? Yes = ema_advanced
+- bollinger: Mean reversion. USE WHEN: RSI < 25 (extreme oversold) OR RSI > 75 (extreme overbought) AND price outside bands. 
+  IMPORTANT: In crash conditions (RSI < 20, trends all bearish, no divergence), bollinger is BETTER than rsi_divergence because 
+  it has an RSI override that fires BUY signals immediately. Use bollinger when market is deeply oversold regardless of trend.
+
+- ema_advanced: Trending market. USE WHEN: trends aligned across 30m+4h+daily, RSI between 35-65, ATR expanding.
+  Do NOT use when all trends are bearish — it will fire SELL signals which fail on Spot.
+
+- vwap: Strong institutional trend. USE WHEN: clear directional move, price consistently one side of VWAP.
+  Similar to ema_advanced but better for intraday trending sessions.
+
+- rsi_divergence: Reversal hunter. USE WHEN: RSI extreme AND divergence_forming=true for at least 2 assets.
+  CRITICAL: Do NOT pick this strategy just because RSI is oversold. It ONLY fires signals when price makes 
+  a lower low while RSI makes a higher low simultaneously. Without divergence_forming=true, it will HOLD all day
+  and generate zero signals. If divergence_forming=false for most assets, do NOT pick this strategy.
+
+- breakout: Momentum. USE WHEN: BB width < 3% (tight squeeze), low ATR, big move expected.
+  Not useful in already-trending or already-crashed markets.
+
+- ema_basic: Simple fallback. Use only if nothing else fits.
+
+DECISION RULES (in order of priority):
+1. If most assets show divergence_forming=true → rsi_divergence
+2. If most assets show crash_mode=true (RSI < 20, no divergence) → bollinger (RSI override will fire BUYs)
+3. If BB width < 3% for most assets → breakout
+4. If trends aligned bullish across all timeframes, RSI 35-65 → ema_advanced or vwap
+5. If ranging/choppy, mixed trends → bollinger
+6. Otherwise → ema_basic
 
 Output format:
-{"recommended_strategy":"bollinger","confidence":82,"market_condition":"choppy/ranging","reasoning":"One sentence","secondary_strategy":"rsi_divergence","key_signals":["signal1","signal2","signal3"]}"""
+{"recommended_strategy":"bollinger","confidence":82,"market_condition":"crash/oversold — bollinger RSI override active","reasoning":"One sentence explaining why this strategy will actually generate signals","secondary_strategy":"rsi_divergence","key_signals":["signal1","signal2","signal3"]}"""
 
 
 def ask_claude(market_data):
@@ -151,7 +203,8 @@ def ask_claude(market_data):
             f"Price: ${d['price']:,.4f} | 24h: {d['change_24h']}% | 7d: {d['change_7d']}%\n"
             f"Trends: 30m={d['trend_30m']} | 4h={d['trend_4h']} | 1d={d['trend_1d']} | aligned={d['aligned']}\n"
             f"RSI: 30m={d['rsi_30m']} | 4h={d['rsi_4h']} | 1d={d['rsi_1d']}\n"
-            f"BB width (4h): {d['bb_width_4h']}% | ATR%: {d['atr_pct_4h']}% | 7d range: {d['range_7d_pct']}%\n\n"
+            f"BB width (4h): {d['bb_width_4h']}% | ATR%: {d['atr_pct_4h']}% | 7d range: {d['range_7d_pct']}%\n"
+            f"divergence_forming: {d['divergence_forming']} | crash_mode: {d['crash_mode']}\n\n"
         )
     summary += f"Available strategies: {', '.join(STRATEGIES)}\nAnalyze and recommend the best strategy."
 
@@ -173,24 +226,20 @@ def ask_claude(market_data):
 
 
 # ─────────────────────────────────────────
-# CONFIG.JSON — write strategy choice here
-# Signal bot reads this file at runtime
-# GITHUB_TOKEN can write regular files fine
+# CONFIG.JSON
 # ─────────────────────────────────────────
 
 def get_config_sha():
-    """Get current SHA of config.json if it exists."""
     url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/contents/{CONFIG_PATH}"
     r = requests.get(url, headers={"Authorization": f"token {GITHUB_TOKEN}",
                                     "Accept": "application/vnd.github.v3+json"}, timeout=10)
     if r.status_code == 404:
-        return None  # file doesn't exist yet
+        return None
     r.raise_for_status()
     return r.json()["sha"]
 
 
 def write_config(rec):
-    """Write strategy decision to config.json in the repo."""
     now = datetime.now(tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
     config = {
         "strategy":           rec["recommended_strategy"],
@@ -209,7 +258,7 @@ def write_config(rec):
         "content": encoded,
     }
     if sha:
-        payload["sha"] = sha  # required for updates
+        payload["sha"] = sha
     url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/contents/{CONFIG_PATH}"
     r = requests.put(url,
                      headers={"Authorization": f"token {GITHUB_TOKEN}",
@@ -232,7 +281,7 @@ def log_decision(rec):
             f.write("timestamp_dubai,strategy,secondary,confidence,market_condition,reasoning\n")
         r = rec.get("reasoning", "").replace('"', "'")
         f.write(
-            f'{ts},{rec["recommended_strategy"]},{rec.get("secondary_strategy","")},'  
+            f'{ts},{rec["recommended_strategy"]},{rec.get("secondary_strategy","")},'
             f'{rec["confidence"]},{rec.get("market_condition","")},"{r}"\n'
         )
 
@@ -252,6 +301,11 @@ def run():
     if not data:
         print("ERROR: no market data — aborting")
         return
+
+    # Print divergence and crash mode summary
+    print("\n  Strategy signal summary:")
+    for sym, d in data.items():
+        print(f"  {sym}: RSI_30m={d['rsi_30m']} | divergence_forming={d['divergence_forming']} | crash_mode={d['crash_mode']}")
 
     print("\n[2/3] Claude analyzing conditions...")
     rec = ask_claude(data)
