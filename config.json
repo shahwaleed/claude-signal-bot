@@ -1,15 +1,13 @@
 {
-  "strategy": "bollinger",
-  "secondary_strategy": "rsi_divergence",
-  "confidence": 90,
-  "market_condition": "Multi-asset crash/recovery with extreme 4h RSI readings across BTC, ETH, SOL, and XRP",
-  "reasoning": "Rule 3 fires: BTC is in crash_mode with 4h RSI at 18.04 (hard override BUY triggers), plus ETH and SOL are in recovering_mode with 4h RSI still deeply depressed (28.97 and 25.86), and XRP 30m RSI at 1.0 is an extreme anomaly \u2014 bollinger RSI overrides will fire BUY signals across all assets in this oversold environment.",
+  "strategy": "rsi_divergence",
+  "secondary_strategy": "bollinger",
+  "confidence": 82,
+  "market_condition": "Deep oversold crash with bullish divergence forming on BTC, ETH, and SOL simultaneously",
+  "reasoning": "Rule 1 fires: divergence=bullish on 3 assets (BTC, ETH, SOL), signaling a potential reversal from extreme oversold levels where 4h RSI values of 17-28 confirm the setup is primed for mean reversion bounces.",
   "key_signals": [
-    "BTC 4h RSI=18.04 triggers bollinger hard BUY override (crash_mode=True)",
-    "ETH and SOL recovering_mode=True with 4h RSI below 30, bollinger mean reversion still valid",
-    "XRP 30m RSI=1.0 is extreme oversold anomaly, bollinger override fires immediately",
-    "All assets down 7-11% on 7d, wide BB bands confirm volatility expansion after crash",
-    "No divergence signals present, rsi_divergence would produce zero signals today"
+    "Bullish divergence confirmed on BTC (4h RSI 17.95), ETH (4h RSI 28.28), and SOL (4h RSI 26.24) \u2014 3 of 4 assets",
+    "Extreme oversold RSI across all timeframes: BTC 30m RSI 26.89, ETH 30m RSI 23.99, SOL 30m RSI 23.4",
+    "Bollinger lower band BUY overrides also active given RSI < 25 on BTC, ETH, SOL \u2014 secondary strategy reinforces entry signals"
   ],
-  "updated_at_dubai": "2026-06-03 18:01:09"
+  "updated_at_dubai": "2026-06-04 00:01:12"
 }
