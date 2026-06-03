@@ -35,17 +35,14 @@ LOG_FILE       = "trade_log.csv"
 
 open_positions = {s: None for s in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]}
 
-# Column index of webhook_fired in the EMA Advanced trade log
+# Column index of webhook_fired in the EMA Advanced trade log:
 # timestamp,symbol,price,signal,confidence,ema9_30m,ema21_30m,rsi7_30m,divergence,
 # ema9_4h,ema21_4h,rsi7_4h,trend_4h,webhook_fired,reasoning
 FIRED_COL = 13
 
 
 def load_positions_from_log():
-    """
-    Seed open_positions from last fired signal per symbol.
-    Uses csv module to correctly handle commas inside reasoning field.
-    """
+    """Seed open_positions from last fired signal per symbol."""
     if not os.path.exists(LOG_FILE):
         return
     last = {}
@@ -85,8 +82,12 @@ def calculate_ema(closes, period):
     for price in closes[period:]: ema = price * k + ema * (1 - k)
     return round(ema, 4)
 
+
 def calculate_rsi(closes, period=7):
-    gains = [max(closes[i]-closes[i-1], 0) for i in range(1, len(closes))]
+    """RSI-7. Returns 50.0 if insufficient data (guard against short lists)."""
+    if len(closes) < period + 1:
+        return 50.0
+    gains  = [max(closes[i]-closes[i-1], 0) for i in range(1, len(closes))]
     losses = [max(closes[i-1]-closes[i], 0) for i in range(1, len(closes))]
     ag = sum(gains[-period:]) / period
     al = sum(losses[-period:]) / period
@@ -94,25 +95,30 @@ def calculate_rsi(closes, period=7):
     if ag == 0: return 1.0
     return round(100 - (100 / (1 + ag/al)), 2)
 
+
 def calculate_rsi_series(closes, period=7):
     return [calculate_rsi(closes[:i], period) for i in range(period + 1, len(closes) + 1)]
 
+
 def detect_divergence(closes, rsi_series, lookback=5):
-    if len(closes) < lookback or len(rsi_series) < lookback: return None
-    rc = closes[-lookback:]; rr = rsi_series[-lookback:]
+    if len(closes) < lookback or len(rsi_series) < lookback:
+        return None
+    rc = closes[-lookback:]
+    rr = rsi_series[-lookback:]
     if rc[-1] < min(rc[:-1]) and not rr[-1] < min(rr[:-1]): return "bullish"
     if rc[-1] > max(rc[:-1]) and not rr[-1] > max(rr[:-1]): return "bearish"
     return None
 
+
 def get_indicators(candles_30m, candles_4h):
     closes_30m = [c["close"] for c in candles_30m[-30:]]
     closes_4h  = [c["close"] for c in candles_4h[-30:]]
-    ema9_30m  = calculate_ema(closes_30m, 9)
-    ema21_30m = calculate_ema(closes_30m, 21)
-    rsi7_30m  = calculate_rsi(closes_30m, 7)
-    ema9_4h   = calculate_ema(closes_4h, 9)
-    ema21_4h  = calculate_ema(closes_4h, 21)
-    rsi7_4h   = calculate_rsi(closes_4h, 7)
+    ema9_30m   = calculate_ema(closes_30m, 9)
+    ema21_30m  = calculate_ema(closes_30m, 21)
+    rsi7_30m   = calculate_rsi(closes_30m, 7)
+    ema9_4h    = calculate_ema(closes_4h, 9)
+    ema21_4h   = calculate_ema(closes_4h, 21)
+    rsi7_4h    = calculate_rsi(closes_4h, 7)
     divergence = detect_divergence(closes_30m, calculate_rsi_series(closes_30m, 7))
     return {"ema9_30m": ema9_30m, "ema21_30m": ema21_30m, "rsi7_30m": rsi7_30m,
             "ema9_4h": ema9_4h, "ema21_4h": ema21_4h, "rsi7_4h": rsi7_4h,
@@ -133,19 +139,33 @@ def parse_claude_json(raw_text):
 
 
 SYSTEM_PROMPT = """You are a professional crypto trading signal engine. Output ONLY a raw JSON object.
-
-STRICT RULES: One JSON object only. No text, no markdown, no backticks.
+No text, no markdown, no backticks. One JSON object only.
 
 STRATEGY: Advanced EMA + Multi-Timeframe + RSI Divergence
-1. PRIMARY: EMA9_30m > EMA21_30m = bullish, < = bearish
-2. CONFIRMATION: 4h trend must agree with 30m, else HOLD
-3. RSI FILTER: RSI7 < 65 for BUY, RSI7 > 35 for SELL
-4. DIVERGENCE: bullish/bearish +15 confidence, opposing -10
-5. OVERRIDE: RSI7_30m > 75 → SELL, RSI7_30m < 25 → BUY
 
-CONFIDENCE: start 50, +15 30m EMA, +20 4h trend, +10 RSI zone, +15 divergence, -10/-20 disagreement
+STEP 1 — MANDATORY HOLD CHECK (evaluate before anything else):
+If 30m EMA direction and 4h trend DISAGREE → output HOLD immediately, confidence 50.
+Do not proceed to scoring. This is the primary false-signal filter.
 
-Output: {"signal":"BUY","confidence":75,"reasoning":"30m bullish EMA crossover confirmed by 4h uptrend"}"""
+STEP 2 — OVERRIDE (only if Step 1 passes):
+- RSI7_30m < 25 → BUY, confidence 95 (extremely oversold)
+- RSI7_30m > 75 → SELL, confidence 95 (extremely overbought)
+
+STEP 3 — NORMAL SIGNAL + CONFIDENCE SCORING (only if Steps 1-2 pass):
+Signal direction: EMA9_30m > EMA21_30m AND 4h bullish → BUY
+                  EMA9_30m < EMA21_30m AND 4h bearish → SELL
+
+Confidence (start 50):
++15  30m EMA confirms signal direction
++20  4h trend confirms signal direction
++10  RSI in safe zone (RSI < 65 for BUY, RSI > 35 for SELL)
++15  divergence confirms signal direction (bullish div → BUY, bearish div → SELL)
+-10  divergence opposes signal (minor conflict)
+-20  RSI opposes signal strongly (RSI > 60 for BUY, RSI < 40 for SELL)
+
+Cap confidence at 100. MIN_CONFIDENCE to fire = 65.
+
+Output: {"signal":"BUY","confidence":85,"reasoning":"30m bullish EMA crossover confirmed by 4h uptrend, RSI not overbought"}"""
 
 
 def ask_claude(symbol, indicators):
