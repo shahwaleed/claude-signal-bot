@@ -12,6 +12,7 @@ Logic:
 import requests
 import json
 import re
+import csv
 import time
 import os
 from datetime import datetime, timezone, timedelta
@@ -37,21 +38,32 @@ LOG_FILE       = "trade_log.csv"
 
 open_positions = {s: None for s in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]}
 
+# Column index of webhook_fired in the VWAP trade log
+# timestamp,symbol,price,signal,confidence,vwap,price_vs_vwap,ema9,ema21,ema_spread,rsi14,webhook_fired,reasoning
+FIRED_COL = 11
+
 
 def load_positions_from_log():
+    """
+    Seed open_positions from the last fired signal per symbol in trade_log.csv.
+    Uses csv module to correctly handle commas inside the quoted reasoning field.
+    """
     if not os.path.exists(LOG_FILE):
         return
     last = {}
     try:
-        with open(LOG_FILE, "r") as f:
-            for line in f:
-                parts = line.strip().split(",")
-                if len(parts) < 5: continue
-                symbol = parts[1]; signal = parts[3]
-                fired  = parts[11] if len(parts) > 11 else "False"
+        with open(LOG_FILE, "r", newline="") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if len(row) < FIRED_COL + 1:
+                    continue
+                symbol = row[1]
+                signal = row[3]
+                fired  = row[FIRED_COL]
                 if symbol in open_positions and signal in ("BUY", "SELL") and fired == "True":
                     last[symbol] = signal
-        for sym, sig in last.items(): open_positions[sym] = sig
+        for sym, sig in last.items():
+            open_positions[sym] = sig
         print("  [SAR] Loaded positions from log:", open_positions)
     except Exception as e:
         print(f"  [SAR] Could not load positions from log: {e}")
@@ -151,6 +163,7 @@ def ask_claude(symbol, ind):
 
 
 def send_close_webhook(symbol, current_price):
+    """Send exit signal to close current open position."""
     current = open_positions.get(symbol)
     if current is None: return False
     close_action = "exit_long" if current == "BUY" else "exit_short"
@@ -169,10 +182,18 @@ def send_close_webhook(symbol, current_price):
 
 
 def fire_webhook(signal_str, price, symbol):
+    """
+    SAR logic:
+    - Same direction already open → skip duplicate entry
+    - Opposite direction open → close first, wait 5s, then open new
+    - No position open → open directly
+    """
     current = open_positions.get(symbol)
+
     if current == signal_str:
         print(f"  [SAR] Already in {signal_str} for {symbol} — skipping")
         return False
+
     if current is not None and current != signal_str:
         print(f"  [SAR] Reversing {current} → {signal_str} for {symbol}")
         if send_close_webhook(symbol, price):
@@ -181,6 +202,7 @@ def fire_webhook(signal_str, price, symbol):
         else:
             print(f"  [SAR] Close failed — aborting reversal for {symbol}")
             return False
+
     action  = "enter_long" if signal_str == "BUY" else "enter_short"
     tp_pct  = TAKE_PROFIT if signal_str == "BUY" else -TAKE_PROFIT
     payload = {"secret": WEBHOOK_SECRET, "max_lag": "300",
@@ -203,13 +225,16 @@ def fire_webhook(signal_str, price, symbol):
 def log_result(symbol, signal, ind, fired):
     ts = datetime.now(tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
     header = not os.path.exists(LOG_FILE) or os.path.getsize(LOG_FILE) == 0
-    with open(LOG_FILE, "a") as f:
+    with open(LOG_FILE, "a", newline="") as f:
+        writer = csv.writer(f, quoting=csv.QUOTE_MINIMAL)
         if header:
-            f.write("timestamp_dubai,symbol,price,signal,confidence,vwap,price_vs_vwap,ema9,ema21,ema_spread,rsi14,webhook_fired,reasoning\n")
-        reasoning = signal.get("reasoning", "").replace('"', "'")
-        f.write(f'{ts},{symbol},{ind["price"]},{signal["signal"]},{signal["confidence"]},'
-                f'{ind["vwap"]},{ind["price_vs_vwap"]},{ind["ema9"]},{ind["ema21"]},'
-                f'{ind["ema_spread"]},{ind["rsi14"]},{fired},"{reasoning}"\n')
+            writer.writerow(["timestamp_dubai", "symbol", "price", "signal", "confidence",
+                             "vwap", "price_vs_vwap", "ema9", "ema21", "ema_spread",
+                             "rsi14", "webhook_fired", "reasoning"])
+        writer.writerow([ts, symbol, ind["price"], signal["signal"], signal["confidence"],
+                         ind["vwap"], ind["price_vs_vwap"], ind["ema9"], ind["ema21"],
+                         ind["ema_spread"], ind["rsi14"], fired,
+                         signal.get("reasoning", "")])
     print(f"  [{ts} Dubai] {symbol} | {signal['signal']} | {signal['confidence']}% | vsVWAP:{ind['price_vs_vwap']}% | Fired:{fired}")
 
 
