@@ -40,6 +40,9 @@ STOP_LOSS      = 3.0
 MIN_CONFIDENCE = 65
 LOG_FILE       = "trade_log.csv"
 
+TP_MIN = 0.5  # minimum take profit % — prevents TP firing immediately
+TP_MAX = 5.0  # maximum take profit %
+
 
 def get_candles(symbol, days=7):
     coin_id = COINGECKO_IDS[symbol]
@@ -129,7 +132,8 @@ CONFIDENCE (start 50):
 +25 band break (<=0.05 or >=0.95), +15 near band, +20 RSI<30 or >70, +10 RSI<40 or >60,
 +10 squeeze, min 80 on override (RSI<25 or >75)
 
-take_profit_pct = distance to middle band. Min 0.5, Max 5.0.
+take_profit_pct = distance from current price to middle band as a percentage.
+MUST be between 0.5 and 5.0. Never return 0 or negative.
 
 Output: {"signal":"BUY","confidence":78,"take_profit_pct":1.2,"reasoning":"Price at lower band with RSI oversold"}"""
 
@@ -152,8 +156,11 @@ def ask_claude(symbol, indicators):
 
 
 def fire_webhook(signal_str, current_price, symbol, take_profit_pct):
+    # Clamp TP to valid range — guards against Claude returning 0 or negative
+    tp_pct = round(max(TP_MIN, min(TP_MAX, float(take_profit_pct))), 2)
+    if signal_str == "SELL":
+        tp_pct = -tp_pct
     action = "enter_long" if signal_str == "BUY" else "enter_short"
-    tp_pct = take_profit_pct if signal_str == "BUY" else -take_profit_pct
     payload = {"secret": WEBHOOK_SECRET, "max_lag": "300",
                "timestamp": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"),
                "trigger_price": str(current_price), "tv_exchange": "BINANCE",

@@ -17,6 +17,13 @@ on:
           - breakout
           - ema_basic
 
+# Serialise runs — if cron fires while a run is already in progress,
+# queue the new run rather than dropping it or running concurrently.
+# Prevents duplicate signals and race conditions on the trade log.
+concurrency:
+  group: signal-bot
+  cancel-in-progress: false
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 

@@ -3,6 +3,12 @@ name: Market Analyzer
 on:
   workflow_dispatch:
 
+# Serialise runs — prevents two analyzer runs writing config.json simultaneously,
+# and prevents an analyzer run from writing config.json while signal_bot is reading it.
+concurrency:
+  group: market-analyzer
+  cancel-in-progress: false
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -24,15 +30,6 @@ jobs:
 
       - name: Install dependencies
         run: pip install requests
-
-      - name: Download previous strategy log
-        uses: dawidd6/action-download-artifact@v6
-        with:
-          workflow: market_analyzer.yml
-          name: strategy-log
-          path: .
-          if_no_artifact_found: ignore
-        continue-on-error: true
 
       - name: Run market analyzer
         env:
