@@ -82,14 +82,16 @@ def calc_atr_pct(candles, p=14):
 
 def detect_rsi_divergence(candles_30m):
     """
-    Check if bullish RSI divergence is forming:
-    Price making lower lows while RSI makes higher lows.
-    Returns True only if pattern is confirmed, not just oversold.
+    Check if bullish OR bearish RSI divergence is forming on 30m candles.
+    Bullish: price making lower low, RSI making higher low (reversal up)
+    Bearish: price making higher high, RSI making lower high (reversal down)
+    Returns: "bullish", "bearish", or False
     """
     if len(candles_30m) < 20:
         return False
     closes = [c[4] for c in candles_30m]
-    # Calculate RSI series
+
+    # Build RSI series
     rsi_series = []
     for i in range(15, len(closes)):
         rsi_series.append(calc_rsi(closes[:i], 14))
@@ -97,16 +99,22 @@ def detect_rsi_divergence(candles_30m):
     if len(rsi_series) < 10:
         return False
 
-    # Look for: recent price lower than 10 candles ago, but RSI higher
     recent_price = closes[-1]
-    past_price   = min(closes[-10:-1])
     recent_rsi   = rsi_series[-1]
-    past_rsi     = min(rsi_series[-10:-1]) if len(rsi_series) >= 10 else rsi_series[0]
 
-    price_lower_low = recent_price < past_price
-    rsi_higher_low  = recent_rsi > past_rsi
+    # Bullish divergence: price lower low, RSI higher low
+    past_price_low = min(closes[-10:-1])
+    past_rsi_low   = min(rsi_series[-10:-1])
+    if recent_price < past_price_low and recent_rsi > past_rsi_low:
+        return "bullish"
 
-    return price_lower_low and rsi_higher_low
+    # Bearish divergence: price higher high, RSI lower high
+    past_price_high = max(closes[-10:-1])
+    past_rsi_high   = max(rsi_series[-10:-1])
+    if recent_price > past_price_high and recent_rsi < past_rsi_high:
+        return "bearish"
+
+    return False
 
 
 def analyze_market():
@@ -131,8 +139,18 @@ def analyze_market():
             rsi_4h  = calc_rsi(cl4h)
             rsi_1d  = calc_rsi(cl1d)
 
-            # Key addition: actually check if divergence is forming
-            divergence_forming = detect_rsi_divergence(c30m)
+            # Divergence: check both directions on 30m
+            divergence = detect_rsi_divergence(c30m)
+
+            # Crash mode: 4h RSI deeply oversold (primary indicator) regardless of 30m bounce
+            # Using 4h as primary because 30m can recover quickly during a dead-cat bounce
+            crash_mode = rsi_4h < 25 and not divergence
+
+            # Overbought mode: mirror of crash — 4h RSI deeply overbought
+            overbought_mode = rsi_4h > 75 and not divergence
+
+            # Recovering mode: 30m RSI bounced but 4h still very low — still needs bollinger
+            recovering_mode = rsi_4h < 35 and rsi_30m > 40 and not divergence
 
             data[sym] = {
                 "price":              cl30[-1],
@@ -146,8 +164,10 @@ def analyze_market():
                 "bb_width_4h":        calc_bb_width(cl4h),
                 "atr_pct_4h":         calc_atr_pct(c4h),
                 "range_7d_pct":       round((h7d - l7d) / l7d * 100, 2) if l7d else 0,
-                "divergence_forming": divergence_forming,
-                "crash_mode":         rsi_30m < 20 and rsi_4h < 30 and not divergence_forming,
+                "divergence":         divergence,   # False, "bullish", or "bearish"
+                "crash_mode":         crash_mode,   # 4h RSI < 25, no divergence
+                "overbought_mode":    overbought_mode,  # 4h RSI > 75, no divergence
+                "recovering_mode":    recovering_mode,  # 30m bounced but 4h still low
             }
         except Exception as e:
             print(f"  ERROR {sym}: {e}")
@@ -163,36 +183,46 @@ Output ONLY a raw JSON object. No text, no markdown, no explanation.
 
 Available strategies and PRECISE conditions for each:
 
-- bollinger: Mean reversion. USE WHEN: RSI < 25 (extreme oversold) OR RSI > 75 (extreme overbought) AND price outside bands. 
-  IMPORTANT: In crash conditions (RSI < 20, trends all bearish, no divergence), bollinger is BETTER than rsi_divergence because 
-  it has an RSI override that fires BUY signals immediately. Use bollinger when market is deeply oversold regardless of trend.
+- bollinger: Mean reversion. Fires BUY when price below lower band OR RSI < 25 (override).
+  Fires SELL when price above upper band OR RSI > 75 (override).
+  USE WHEN: crash_mode=True, overbought_mode=True, recovering_mode=True, or ranging/choppy market.
+  This is the most reliable strategy for extreme RSI conditions because it has hard overrides.
+  IMPORTANT: even if 30m RSI has bounced, if recovering_mode=True (4h RSI still < 35), use bollinger.
 
-- ema_advanced: Trending market. USE WHEN: trends aligned across 30m+4h+daily, RSI between 35-65, ATR expanding.
-  Do NOT use when all trends are bearish — it will fire SELL signals which fail on Spot.
+- ema_advanced: Trend following with multi-timeframe confirmation.
+  USE WHEN: trends aligned BULLISH across 30m+4h+daily, RSI between 40-65.
+  DO NOT use when trends are bearish — fires SELL signals which fail on Spot.
+  DO NOT use when RSI is extreme (< 30 or > 70).
 
-- vwap: Strong institutional trend. USE WHEN: clear directional move, price consistently one side of VWAP.
-  Similar to ema_advanced but better for intraday trending sessions.
+- vwap: Institutional trend following.
+  USE WHEN: same as ema_advanced but price has been consistently one side of VWAP for multiple sessions.
+  Better than ema_advanced during London/NY session overlaps.
 
-- rsi_divergence: Reversal hunter. USE WHEN: RSI extreme AND divergence_forming=true for at least 2 assets.
-  CRITICAL: Do NOT pick this strategy just because RSI is oversold. It ONLY fires signals when price makes 
-  a lower low while RSI makes a higher low simultaneously. Without divergence_forming=true, it will HOLD all day
-  and generate zero signals. If divergence_forming=false for most assets, do NOT pick this strategy.
+- rsi_divergence: Reversal detection.
+  USE WHEN: divergence="bullish" OR divergence="bearish" for at least 2 assets.
+  CRITICAL: ONLY pick this if divergence is actually forming (not just False).
+  If divergence=False for most assets, this strategy will produce zero signals all day — do not pick it.
 
-- breakout: Momentum. USE WHEN: BB width < 3% (tight squeeze), low ATR, big move expected.
-  Not useful in already-trending or already-crashed markets.
+- breakout: Momentum breakout.
+  USE WHEN: bb_width_4h < 3% for most assets (tight squeeze), low ATR.
+  NOT useful in trending or already-crashed/extended markets.
 
-- ema_basic: Simple fallback. Use only if nothing else fits.
+- ema_basic: Simple EMA fallback.
+  USE WHEN: nothing else fits. Moderate trend, RSI 40-60, some directional bias.
 
-DECISION RULES (in order of priority):
-1. If most assets show divergence_forming=true → rsi_divergence
-2. If most assets show crash_mode=true (RSI < 20, no divergence) → bollinger (RSI override will fire BUYs)
-3. If BB width < 3% for most assets → breakout
-4. If trends aligned bullish across all timeframes, RSI 35-65 → ema_advanced or vwap
-5. If ranging/choppy, mixed trends → bollinger
-6. Otherwise → ema_basic
+DECISION RULES (strict priority order):
+1. divergence="bullish" on 2+ assets → rsi_divergence (bullish reversal setup)
+2. divergence="bearish" on 2+ assets → rsi_divergence (bearish reversal setup)
+3. crash_mode=True on 2+ assets → bollinger (4h RSI < 25, RSI override fires BUYs)
+4. overbought_mode=True on 2+ assets → bollinger (4h RSI > 75, RSI override fires SELLs)
+5. recovering_mode=True on 2+ assets → bollinger (4h still depressed, mean reversion still valid)
+6. bb_width_4h < 3% on 2+ assets → breakout
+7. trends aligned bullish all timeframes, RSI 40-65 → ema_advanced or vwap
+8. ranging/choppy, mixed trends, RSI 40-60 → bollinger
+9. fallback → ema_basic
 
 Output format:
-{"recommended_strategy":"bollinger","confidence":82,"market_condition":"crash/oversold — bollinger RSI override active","reasoning":"One sentence explaining why this strategy will actually generate signals","secondary_strategy":"rsi_divergence","key_signals":["signal1","signal2","signal3"]}"""
+{"recommended_strategy":"bollinger","confidence":85,"market_condition":"brief description","reasoning":"One sentence explaining which rule fired and why this strategy will generate signals today","secondary_strategy":"rsi_divergence","key_signals":["signal1","signal2","signal3"]}"""
 
 
 def ask_claude(market_data):
@@ -204,9 +234,10 @@ def ask_claude(market_data):
             f"Trends: 30m={d['trend_30m']} | 4h={d['trend_4h']} | 1d={d['trend_1d']} | aligned={d['aligned']}\n"
             f"RSI: 30m={d['rsi_30m']} | 4h={d['rsi_4h']} | 1d={d['rsi_1d']}\n"
             f"BB width (4h): {d['bb_width_4h']}% | ATR%: {d['atr_pct_4h']}% | 7d range: {d['range_7d_pct']}%\n"
-            f"divergence_forming: {d['divergence_forming']} | crash_mode: {d['crash_mode']}\n\n"
+            f"divergence={d['divergence']} | crash_mode={d['crash_mode']} | "
+            f"overbought_mode={d['overbought_mode']} | recovering_mode={d['recovering_mode']}\n\n"
         )
-    summary += f"Available strategies: {', '.join(STRATEGIES)}\nAnalyze and recommend the best strategy."
+    summary += f"Available strategies: {', '.join(STRATEGIES)}\nApply the decision rules in strict priority order and recommend the best strategy."
 
     resp = requests.post(
         "https://api.anthropic.com/v1/messages",
@@ -302,10 +333,12 @@ def run():
         print("ERROR: no market data — aborting")
         return
 
-    # Print divergence and crash mode summary
-    print("\n  Strategy signal summary:")
+    # Print mode summary for easy log reading
+    print("\n  Mode summary:")
     for sym, d in data.items():
-        print(f"  {sym}: RSI_30m={d['rsi_30m']} | divergence_forming={d['divergence_forming']} | crash_mode={d['crash_mode']}")
+        print(f"  {sym}: RSI_4h={d['rsi_4h']} | RSI_30m={d['rsi_30m']} | "
+              f"divergence={d['divergence']} | crash={d['crash_mode']} | "
+              f"overbought={d['overbought_mode']} | recovering={d['recovering_mode']}")
 
     print("\n[2/3] Claude analyzing conditions...")
     rec = ask_claude(data)
