@@ -17,9 +17,7 @@ on:
           - breakout
           - ema_basic
 
-# Serialise runs — if cron fires while a run is already in progress,
-# queue the new run rather than dropping it or running concurrently.
-# Prevents duplicate signals and race conditions on the trade log.
+# Serialise runs — prevents duplicate signals and race conditions on the trade log.
 concurrency:
   group: signal-bot
   cancel-in-progress: false
@@ -46,15 +44,6 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Download previous trade log
-        uses: dawidd6/action-download-artifact@v6
-        with:
-          workflow: signal_bot.yml
-          name: trade-log
-          path: .
-          if_no_artifact_found: ignore
-        continue-on-error: true
-
       - name: Read strategy from config.json or manual override
         id: strategy
         run: |
@@ -71,13 +60,34 @@ jobs:
             echo "Source: default — bollinger"
           fi
 
+      - name: Set artifact and log file names
+        id: names
+        run: |
+          STRATEGY="${{ steps.strategy.outputs.strategy }}"
+          # Artifact name uses hyphens (GitHub artifact naming)
+          ARTIFACT="trade-log-${STRATEGY//_/-}"
+          # Log file name uses underscores (Python filename)
+          LOGFILE="trade_log_${STRATEGY}.csv"
+          echo "artifact=$ARTIFACT" >> $GITHUB_OUTPUT
+          echo "logfile=$LOGFILE" >> $GITHUB_OUTPUT
+          echo "Strategy: $STRATEGY | Artifact: $ARTIFACT | Log: $LOGFILE"
+
+      - name: Download previous trade log for this strategy
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: signal_bot.yml
+          name: ${{ steps.names.outputs.artifact }}
+          path: .
+          if_no_artifact_found: ignore
+        continue-on-error: true
+
       - name: Run selected strategy
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
         run: |
           STRATEGY="${{ steps.strategy.outputs.strategy }}"
-          echo "Running strategy: $STRATEGY"
+          echo "Run STRATEGY=\"$STRATEGY\""
           if [ "$STRATEGY" = "bollinger" ]; then
             python strategy_bollinger.py
           elif [ "$STRATEGY" = "ema_advanced" ]; then
@@ -95,7 +105,7 @@ jobs:
       - name: Upload updated trade log
         uses: actions/upload-artifact@v4
         with:
-          name: trade-log
-          path: trade_log.csv
+          name: ${{ steps.names.outputs.artifact }}
+          path: ${{ steps.names.outputs.logfile }}
           retention-days: 90
           overwrite: true
