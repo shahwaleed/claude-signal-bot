@@ -12,6 +12,7 @@ Valid CoinGecko days: 1, 7, 14, 30, 90, 180, 365
 
 import requests
 import json
+import re
 import time
 import os
 from datetime import datetime, timezone, timedelta
@@ -104,6 +105,18 @@ def get_indicators(candles):
             "trend": "bullish" if ema9 > ema21 else "bearish"}
 
 
+def parse_claude_json(raw_text):
+    raw_text = raw_text.strip()
+    if raw_text.startswith("```"):
+        parts = raw_text.split("```")
+        raw_text = parts[1]
+        if raw_text.startswith("json"): raw_text = raw_text[4:]
+        raw_text = raw_text.strip()
+    match = re.search(r'\{[^{}]*\}', raw_text, re.DOTALL)
+    if match: return json.loads(match.group())
+    return json.loads(raw_text)
+
+
 SYSTEM_PROMPT = """You are a trading signal engine using RSI Divergence strategy.
 Output ONLY a raw JSON object.
 
@@ -128,11 +141,7 @@ def ask_claude(symbol, ind):
                          json={"model": "claude-sonnet-4-6", "max_tokens": 200, "system": SYSTEM_PROMPT,
                                "messages": [{"role": "user", "content": msg}]}, timeout=30)
     resp.raise_for_status()
-    raw = resp.json()["content"][0]["text"].strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"): raw = raw[4:]
-    return json.loads(raw.strip())
+    return parse_claude_json(resp.json()["content"][0]["text"])
 
 
 def fire_webhook(signal_str, price, symbol):
