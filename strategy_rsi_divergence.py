@@ -53,7 +53,7 @@ def calculate_rsi_series(closes, period=14):
     rsi_values = []
     for i in range(period + 1, len(closes) + 1):
         window = closes[:i]
-        gains = [max(window[j]-window[j-1], 0) for j in range(1, len(window))]
+        gains  = [max(window[j]-window[j-1], 0) for j in range(1, len(window))]
         losses = [max(window[j-1]-window[j], 0) for j in range(1, len(window))]
         avg_gain = sum(gains[-period:]) / period
         avg_loss = sum(losses[-period:]) / period
@@ -64,24 +64,39 @@ def calculate_rsi_series(closes, period=14):
 
 
 def find_divergence(closes, rsi_series, lookback=10):
+    """
+    Detect bullish or bearish RSI divergence.
+
+    Compares current candle (pw[-1]) against ALL prior candles in the lookback
+    window (pw[:-1]). Previously used pw[:-3] which excluded the 3 most recent
+    prior candles, causing short-duration divergences to be missed.
+    """
     if len(closes) < lookback or len(rsi_series) < lookback:
         return {"type": "none", "strength": 0, "details": "insufficient data"}
-    pw = closes[-lookback:]; rw = rsi_series[-lookback:]
+    pw = closes[-lookback:]
+    rw = rsi_series[-lookback:]
     cur_p, cur_r = pw[-1], rw[-1]
-    prev_low_p  = min(pw[:-3]) if len(pw) > 3 else pw[0]
-    prev_low_r  = min(rw[:-3]) if len(rw) > 3 else rw[0]
-    prev_high_p = max(pw[:-3]) if len(pw) > 3 else pw[0]
-    prev_high_r = max(rw[:-3]) if len(rw) > 3 else rw[0]
+
+    # Compare current vs all prior candles in window (excluding only current)
+    prev_low_p  = min(pw[:-1])
+    prev_low_r  = min(rw[:-1])
+    prev_high_p = max(pw[:-1])
+    prev_high_r = max(rw[:-1])
+
+    # Bullish: price makes lower low, RSI makes higher low
     if cur_p < prev_low_p and cur_r > prev_low_r:
         pd = round((prev_low_p - cur_p) / prev_low_p * 100, 2)
         rd = round(cur_r - prev_low_r, 2)
-        return {"type": "bullish", "strength": min(100, int(pd*10+rd*2)),
+        return {"type": "bullish", "strength": min(100, int(pd*10 + rd*2)),
                 "details": f"price -{pd}% but RSI +{rd}pts"}
+
+    # Bearish: price makes higher high, RSI makes lower high
     if cur_p > prev_high_p and cur_r < prev_high_r:
         pd = round((cur_p - prev_high_p) / prev_high_p * 100, 2)
         rd = round(prev_high_r - cur_r, 2)
-        return {"type": "bearish", "strength": min(100, int(pd*10+rd*2)),
+        return {"type": "bearish", "strength": min(100, int(pd*10 + rd*2)),
                 "details": f"price +{pd}% but RSI -{rd}pts"}
+
     return {"type": "none", "strength": 0, "details": "no divergence detected"}
 
 
@@ -117,14 +132,26 @@ def parse_claude_json(raw_text):
 SYSTEM_PROMPT = """You are a trading signal engine using RSI Divergence strategy.
 Output ONLY a raw JSON object. No text, no markdown, no explanation.
 
-BUY: divergence.type = bullish (price lower low, RSI higher low)
-SELL: divergence.type = bearish (price higher high, RSI lower high)
-HOLD: divergence.type = none OR strength < 20
+SIGNAL RULES:
+BUY:  divergence.type = "bullish" AND strength >= 20
+SELL: divergence.type = "bearish" AND strength >= 20
+HOLD: divergence.type = "none" OR strength < 20
 
-CONFIDENCE (start 50): +20 divergence detected, +10/+20/+25 by strength tier,
-+15 EMA trend confirms, +10 RSI extreme. HOLD if no divergence.
+CONFIDENCE SCORING (start at 50):
++20  divergence detected (type is bullish or bearish)
++10  strength 20-29  (weak divergence)
++20  strength 30-59  (moderate divergence)
++25  strength 60-100 (strong divergence)
++15  EMA trend confirms reversal direction:
+       bullish divergence + bearish EMA trend (oversold in downtrend)
+       bearish divergence + bullish EMA trend (overbought in uptrend)
++10  RSI extreme confirms:
+       bullish divergence + RSI < 35 (deeply oversold)
+       bearish divergence + RSI > 65 (deeply overbought)
 
-Output: {"signal":"BUY","confidence":78,"reasoning":"Bullish RSI divergence — selling exhausted"}"""
+Cap confidence at 100. If no divergence or strength < 20, output HOLD at confidence 50.
+
+Output: {"signal":"BUY","confidence":85,"reasoning":"Bullish RSI divergence strength=45 — price lower low while RSI recovering from oversold, bearish EMA trend confirms reversal setup"}"""
 
 
 def ask_claude(symbol, ind):
