@@ -1,15 +1,15 @@
 {
-  "strategy": "rsi_divergence",
-  "secondary_strategy": "ema_advanced",
-  "confidence": 88,
-  "market_condition": "oversold extremes across multiple assets",
-  "reasoning": "RSI is critically oversold on 4h and daily timeframes across all major assets (BTC 8.32, ETH 21, SOL 20.39, XRP 20), signaling exhausted bearish momentum and high probability of mean reversion or reversal.",
+  "strategy": "bollinger",
+  "secondary_strategy": "rsi_divergence",
+  "confidence": 85,
+  "market_condition": "extreme oversold on 4h/daily with RSI values near crash levels (7-20 range) across all assets",
+  "reasoning": "With 4h RSI values of 7.58 (BTC), 19.86 (ETH), 19.27 (SOL), and 20.0 (XRP) \u2014 all deeply oversold \u2014 bollinger's RSI override will fire BUY signals immediately without requiring divergence confirmation, making it the only strategy that will actively generate signals in this market.",
   "key_signals": [
-    "4h RSI below 25 on BTC, ETH, SOL, XRP \u2014 extreme oversold readings rarely sustained",
-    "All trends aligned bearish but RSI divergence suggests bearish exhaustion imminent",
-    "BB width expanded 8-13% indicating volatility spike typical of capitulation bottoms",
-    "7d range 13-16% shows significant sell-off magnitude supporting reversal setup",
-    "30m RSI showing early stabilization (BTC 45, XRP 50) vs 4h \u2014 potential bullish divergence forming"
+    "BTC 4h RSI at 7.58 \u2014 extreme oversold, bollinger RSI override will trigger BUY",
+    "ETH/SOL/XRP 4h RSI all below 20 \u2014 historically strong mean reversion zone",
+    "All trends bearish and aligned, ruling out ema_advanced/vwap; no divergence rules out rsi_divergence",
+    "BB width 11-15% on 4h indicates bands are wide enough for price to revert toward mean",
+    "30m RSI 55-62 shows short-term bounce momentum already building on some assets"
   ],
-  "updated_at_dubai": "2026-06-03 06:01:08"
+  "updated_at_dubai": "2026-06-03 11:38:22"
 }
