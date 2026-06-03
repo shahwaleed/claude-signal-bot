@@ -2,6 +2,11 @@
 Strategy: RSI Divergence
 Best for: Catching reversals at market turning points
 Log file: trade_log_rsi_divergence.csv
+
+Fixes applied:
+  1. Flat market RSI returns 50.0 (neutral) not 100.0
+  2. Strength uses round() not int() — reduces tier boundary artifacts
+  3. Trend-agrees penalty (-10) for lower-quality same-direction signals
 """
 
 import requests, json, re, csv, time, os
@@ -24,7 +29,7 @@ SYMBOLS        = ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT"]
 TAKE_PROFIT    = 2.5
 STOP_LOSS      = 3.0
 MIN_CONFIDENCE = 68
-LOG_FILE       = "trade_log_rsi_divergence.csv"   # strategy-specific log
+LOG_FILE       = "trade_log_rsi_divergence.csv"
 
 
 def get_candles(symbol, days=7):
@@ -37,19 +42,31 @@ def get_candles(symbol, days=7):
 
 
 def calculate_rsi_series(closes, period=14):
+    """
+    Build RSI series over a growing window.
+    FIX 1: flat market (ag=0 AND al=0) returns 50.0 (neutral), not 100.0.
+            The old code hit the al==0 branch first, returning 100.0 incorrectly.
+    """
     vals=[]
     for i in range(period+1, len(closes)+1):
         w=closes[:i]
         g=[max(w[j]-w[j-1],0) for j in range(1,len(w))]
         l=[max(w[j-1]-w[j],0) for j in range(1,len(w))]
         ag,al=sum(g[-period:])/period,sum(l[-period:])/period
-        if al==0: vals.append(100.0)
+        if ag==0 and al==0: vals.append(50.0)   # flat market → neutral
+        elif al==0: vals.append(100.0)
         elif ag==0: vals.append(1.0)
         else: vals.append(round(100-(100/(1+ag/al)),2))
     return vals
 
 
 def find_divergence(closes, rs, lb=10):
+    """
+    Detect RSI divergence against all prior candles in the lookback window.
+    FIX 2: strength uses round() not int() — reduces tier boundary sensitivity.
+            int(29.9) = 29 (weak), round(29.9) = 30 (moderate): a 0.01% price
+            difference no longer arbitrarily shifts confidence by 10 points.
+    """
     if len(closes)<lb or len(rs)<lb:
         return {"type":"none","strength":0,"details":"insufficient data"}
     pw=closes[-lb:]; rw=rs[-lb:]
@@ -58,10 +75,10 @@ def find_divergence(closes, rs, lb=10):
     php=max(pw[:-1]); phr=max(rw[:-1])
     if cp<plp and cr>plr:
         pd=round((plp-cp)/plp*100,2); rd=round(cr-plr,2)
-        return {"type":"bullish","strength":min(100,int(pd*10+rd*2)),"details":f"price -{pd}% RSI +{rd}pts"}
+        return {"type":"bullish","strength":min(100,round(pd*10+rd*2)),"details":f"price -{pd}% RSI +{rd}pts"}
     if cp>php and cr<phr:
         pd=round((cp-php)/php*100,2); rd=round(phr-cr,2)
-        return {"type":"bearish","strength":min(100,int(pd*10+rd*2)),"details":f"price +{pd}% RSI -{rd}pts"}
+        return {"type":"bearish","strength":min(100,round(pd*10+rd*2)),"details":f"price +{pd}% RSI -{rd}pts"}
     return {"type":"none","strength":0,"details":"no divergence"}
 
 
@@ -94,20 +111,28 @@ def parse_claude_json(raw):
 SYSTEM_PROMPT = """You are a trading signal engine using RSI Divergence strategy.
 Output ONLY a raw JSON object. No text, no markdown.
 
+This strategy detects REVERSALS — signals are highest quality when the EMA trend
+OPPOSES the divergence direction (e.g. bearish trend + bullish divergence = likely bottom).
+
 BUY:  divergence.type="bullish" AND strength>=20
 SELL: divergence.type="bearish" AND strength>=20
 HOLD: type="none" OR strength<20
 
 CONFIDENCE (start 50):
 +20 divergence detected
-+10 strength 20-29 (weak)
-+20 strength 30-59 (moderate)
-+25 strength 60-100 (strong)
-+15 EMA trend confirms reversal direction
-+10 RSI extreme (bullish div+RSI<35, bearish div+RSI>65)
-Cap 100.
++10 strength 20-29 (weak divergence)
++20 strength 30-59 (moderate divergence)
++25 strength 60-100 (strong divergence)
++15 EMA trend OPPOSES signal direction — true reversal setup:
+     bullish div + bearish EMA trend = oversold in downtrend (high quality)
+     bearish div + bullish EMA trend = overbought in uptrend (high quality)
+-10 EMA trend AGREES with signal direction — continuation, not reversal (lower quality):
+     bullish div + bullish EMA trend = already going up
+     bearish div + bearish EMA trend = already going down
++10 RSI extreme confirms (bullish div+RSI<35, bearish div+RSI>65)
+Cap confidence at 100.
 
-Output: {"signal":"BUY","confidence":85,"reasoning":"Bullish RSI divergence strength=45"}"""
+Output: {"signal":"BUY","confidence":85,"reasoning":"Bullish RSI divergence strength=45, bearish trend confirms reversal setup"}"""
 
 
 def ask_claude(symbol, ind):
