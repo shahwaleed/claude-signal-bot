@@ -1,15 +1,13 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "rsi_divergence",
-  "confidence": 85,
-  "market_condition": "extreme oversold on 4h/daily with RSI values near crash levels (7-20 range) across all assets",
-  "reasoning": "With 4h RSI values of 7.58 (BTC), 19.86 (ETH), 19.27 (SOL), and 20.0 (XRP) \u2014 all deeply oversold \u2014 bollinger's RSI override will fire BUY signals immediately without requiring divergence confirmation, making it the only strategy that will actively generate signals in this market.",
+  "secondary_strategy": "ema_basic",
+  "confidence": 81,
+  "market_condition": "deeply oversold across all major assets \u2014 4h RSI near crash levels, all trends bearish",
+  "reasoning": "With 4h RSI at 19-20 across BTC/ETH/SOL and daily RSI at extreme lows (7-19), bollinger's RSI override will fire BUY signals immediately without needing divergence confirmation, making it the only strategy that will actively generate signals in this oversold environment.",
   "key_signals": [
-    "BTC 4h RSI at 7.58 \u2014 extreme oversold, bollinger RSI override will trigger BUY",
-    "ETH/SOL/XRP 4h RSI all below 20 \u2014 historically strong mean reversion zone",
-    "All trends bearish and aligned, ruling out ema_advanced/vwap; no divergence rules out rsi_divergence",
-    "BB width 11-15% on 4h indicates bands are wide enough for price to revert toward mean",
-    "30m RSI 55-62 shows short-term bounce momentum already building on some assets"
+    "BTC 4h RSI=19.41 and 1d RSI=7.58 \u2014 extreme oversold, bollinger RSI override threshold breached",
+    "ETH/SOL 4h RSI at 19-20 with all timeframes bearish \u2014 mean reversion setup forming",
+    "BB width 10-15% across assets indicates already-expanded bands consistent with crash/reversion entry zone"
   ],
-  "updated_at_dubai": "2026-06-03 11:38:22"
+  "updated_at_dubai": "2026-06-03 12:01:09"
 }
