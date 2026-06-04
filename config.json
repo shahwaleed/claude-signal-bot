@@ -1,13 +1,13 @@
 {
   "strategy": "rsi_divergence",
   "secondary_strategy": "bollinger",
-  "confidence": 82,
-  "market_condition": "Deep oversold crash with bullish divergence forming on BTC, ETH, and SOL simultaneously",
-  "reasoning": "Rule 1 fires: divergence=bullish on 3 assets (BTC, ETH, SOL), signaling a potential reversal from extreme oversold levels where 4h RSI values of 17-28 confirm the setup is primed for mean reversion bounces.",
+  "confidence": 78,
+  "market_condition": "Broad market crash with bullish divergence forming on ETH, SOL, and XRP amid extreme oversold RSI conditions across all assets",
+  "reasoning": "Rule 1 fires: divergence=bullish on 3 assets (ETH, SOL, XRP), signaling a potential reversal setup even within the broader bearish trend; BTC crash_mode with RSI 17.51 adds confluence that a bounce is overdue",
   "key_signals": [
-    "Bullish divergence confirmed on BTC (4h RSI 17.95), ETH (4h RSI 28.28), and SOL (4h RSI 26.24) \u2014 3 of 4 assets",
-    "Extreme oversold RSI across all timeframes: BTC 30m RSI 26.89, ETH 30m RSI 23.99, SOL 30m RSI 23.4",
-    "Bollinger lower band BUY overrides also active given RSI < 25 on BTC, ETH, SOL \u2014 secondary strategy reinforces entry signals"
+    "Bullish divergence confirmed on ETH (4h RSI 27.53), SOL (4h RSI 25.2), and XRP (4h RSI 31.82)",
+    "BTC in crash_mode with RSI 17.51 on 4h \u2014 extreme oversold conditions across entire market",
+    "All assets down 6-12% on 7d with BB widths expanded 14-19%, indicating volatility exhaustion potential"
   ],
-  "updated_at_dubai": "2026-06-04 00:01:12"
+  "updated_at_dubai": "2026-06-04 06:01:04"
 }
