@@ -1,15 +1,15 @@
 {
   "strategy": "bollinger",
   "secondary_strategy": "rsi_divergence",
-  "confidence": 82,
-  "market_condition": "Market-wide crash with BTC and ETH in crash_mode (4h RSI ~15-18), SOL and XRP showing bullish divergence but still deeply oversold",
-  "reasoning": "Rule 3 fires first: crash_mode=True on 2+ assets (BTC 4h RSI=15.84, ETH 4h RSI=18.45), triggering bollinger which has hard RSI < 25 override BUY signals for extreme oversold conditions; bullish divergence on SOL/XRP supports mean reversion thesis but crash_mode priority takes precedence",
+  "confidence": 92,
+  "market_condition": "Crash/extreme oversold conditions across multiple assets with 4h RSI deeply depressed",
+  "reasoning": "Rule 3 fired: ETH and SOL both have crash_mode=True with 4h RSI at 15.33 and 14.44 respectively, triggering bollinger hard BUY override for extreme RSI < 25 conditions; BTC and XRP also show 4h RSI near crash levels (14.19 and 23.08).",
   "key_signals": [
-    "BTC 4h RSI=15.84 \u2014 extreme oversold, bollinger BUY override active",
-    "ETH 4h RSI=18.45 \u2014 extreme oversold, bollinger BUY override active",
-    "SOL + XRP showing bullish divergence, reinforcing potential mean reversion bounce",
-    "All assets down 6-12% in 7 days \u2014 capitulation-level selling across the board",
-    "BB width 14-20% on all pairs \u2014 wide bands confirm crash extension, not squeeze"
+    "ETH crash_mode=True with 4h RSI=15.33 (extreme oversold)",
+    "SOL crash_mode=True with 4h RSI=14.44 (extreme oversold)",
+    "BTC bullish divergence forming with 4h RSI=14.19",
+    "XRP bullish divergence confirmed with 4h RSI=23.08",
+    "Bollinger lower band BUY override active for all 4 assets"
   ],
-  "updated_at_dubai": "2026-06-04 12:01:06"
+  "updated_at_dubai": "2026-06-04 18:01:07"
 }
