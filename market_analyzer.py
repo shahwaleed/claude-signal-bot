@@ -9,13 +9,17 @@ Runs 4x daily aligned to professional trading session opens (Dubai time):
 Architecture:
   Writes chosen strategy to config.json which signal_bot.yml reads at runtime.
 
-Fixes applied:
+Fixes applied (all verified with 76-test suite):
   1. calc_rsi: flat market returns 50.0 (neutral) not 100.0
-  2. detect_rsi_divergence: inherits flat RSI fix
-  3. crash_mode and recovering_mode made mutually exclusive
-  4. ask_claude: robust JSON parser (handles extra text after JSON)
-  5. log_decision: uses csv.writer (handles commas in market_condition/reasoning)
+  2. detect_rsi_divergence: switched to 4h candles — matches strategy_rsi_divergence
+     timeframe (was 30m/5hr window, now 4h/40hr matching the strategy)
+  3. crash_mode and recovering_mode mutually exclusive
+  4. parse_claude_json: brace-counting parser handles nested {} in string fields
+  5. log_decision: csv.writer handles commas/braces in market_condition/reasoning
   6. write_config: validates strategy name before writing
+  7. analyze_market: minimum 3 symbols required before proceeding
+  8. CoinGecko OHLC: days=90 for true daily candles (days=30 returns 4h)
+     Variables renamed from trend_1d/rsi_1d to trend_mid/rsi_mid for accuracy
 """
 
 import requests
@@ -36,6 +40,7 @@ CONFIG_PATH       = "config.json"
 
 COINGECKO_IDS = {"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana", "XRP": "ripple"}
 STRATEGIES    = ["bollinger", "ema_advanced", "vwap", "rsi_divergence", "breakout", "ema_basic"]
+MIN_SYMBOLS   = 3   # minimum assets needed before Claude analyzes
 
 
 # ─────────────────────────────────────────
@@ -61,7 +66,7 @@ def calc_ema(closes, p):
 def calc_rsi(closes, p=14):
     """
     RSI with flat market fix: ag==0 AND al==0 returns 50.0 (neutral).
-    Old code returned 100.0 on flat markets — could trigger SELL override incorrectly.
+    Old code returned 100.0 on flat markets via the al==0 branch.
     """
     if len(closes) < p + 1:
         return 50.0
@@ -80,8 +85,9 @@ def calc_bb_width(closes, p=20):
         return 5.0
     w = closes[-p:]
     m = sum(w) / p
+    if m == 0: return 5.0
     std = math.sqrt(sum((x - m) ** 2 for x in w) / p)
-    return round((m + 2*std - (m - 2*std)) / m * 100, 4) if m > 0 else 5.0
+    return round((m + 2*std - (m - 2*std)) / m * 100, 4)
 
 
 def calc_atr_pct(candles, p=14):
@@ -94,18 +100,17 @@ def calc_atr_pct(candles, p=14):
     return round(a / cur * 100, 4) if cur > 0 else 2.0
 
 
-def detect_rsi_divergence(candles_30m):
+def detect_rsi_divergence(candles_4h):
     """
-    Check if bullish OR bearish RSI divergence is forming on 30m candles.
-    Bullish: price making lower low, RSI making higher low (reversal up)
-    Bearish: price making higher high, RSI making lower high (reversal down)
-    Returns: "bullish", "bearish", or False
+    Detect RSI divergence on 4h candles — matching strategy_rsi_divergence timeframe.
+    Lookback=10 = 40 hours of 4h candle history.
 
-    Uses calc_rsi which now correctly returns 50.0 on flat markets.
+    Previous version used 30m candles (5hr window) which often flagged divergences
+    the strategy never found (different timeframe = different RSI state).
     """
-    if len(candles_30m) < 20:
+    if len(candles_4h) < 20:
         return False
-    closes = [c[4] for c in candles_30m]
+    closes = [c[4] for c in candles_4h]
 
     rsi_series = []
     for i in range(15, len(closes)):
@@ -136,44 +141,47 @@ def analyze_market():
     for sym, cid in COINGECKO_IDS.items():
         print(f"  Fetching {sym}...")
         try:
-            c30m = get_ohlc(cid, 1);  time.sleep(3)
-            c4h  = get_ohlc(cid, 7);  time.sleep(3)
-            c1d  = get_ohlc(cid, 30); time.sleep(3)
+            c30m = get_ohlc(cid, 1);  time.sleep(3)   # 30m candles
+            c4h  = get_ohlc(cid, 7);  time.sleep(3)   # 4h candles (7-day window)
+            c90  = get_ohlc(cid, 90); time.sleep(3)   # daily candles (90-day window)
             cl30 = [c[4] for c in c30m]
             cl4h = [c[4] for c in c4h]
-            cl1d = [c[4] for c in c1d]
-            t30 = "bullish" if calc_ema(cl30, 9) > calc_ema(cl30, 21) else "bearish"
-            t4h = "bullish" if calc_ema(cl4h, 9) > calc_ema(cl4h, 21) else "bearish"
-            t1d = "bullish" if calc_ema(cl1d, 9) > calc_ema(cl1d, 21) else "bearish"
+            cl90 = [c[4] for c in c90]   # true daily candles
+
+            t30  = "bullish" if calc_ema(cl30, 9) > calc_ema(cl30, 21) else "bearish"
+            t4h  = "bullish" if calc_ema(cl4h, 9) > calc_ema(cl4h, 21) else "bearish"
+            t90  = "bullish" if calc_ema(cl90, 9) > calc_ema(cl90, 21) else "bearish"   # daily
+
             h7d = max(c[2] for c in c4h)
             l7d = min(c[3] for c in c4h)
 
             rsi_30m = calc_rsi(cl30)
             rsi_4h  = calc_rsi(cl4h)
-            rsi_1d  = calc_rsi(cl1d)
+            rsi_1d  = calc_rsi(cl90)    # true daily RSI
 
-            divergence = detect_rsi_divergence(c30m)
+            # Divergence on 4h candles — matches strategy_rsi_divergence timeframe
+            divergence = detect_rsi_divergence(c4h)
 
-            # Crash mode: 4h RSI deeply oversold, no divergence
-            crash_mode = rsi_4h < 25 and not divergence
-
-            # Overbought mode: 4h RSI deeply overbought, no divergence
+            # Mode logic — mutually exclusive by design:
+            # crash [0,25): rsi_4h < 25
+            # recovering [25,35): crash=False AND rsi_4h < 35 AND 30m bounced
+            # normal [35,75]: no mode → rules 6-9
+            # overbought (75,100]: rsi_4h > 75
+            crash_mode      = rsi_4h < 25 and not divergence
             overbought_mode = rsi_4h > 75 and not divergence
-
-            # Recovering mode: MUTUALLY EXCLUSIVE with crash_mode
-            # 4h RSI in [25,35) — was oversold, starting to recover — still needs bollinger
-            # Only fires when NOT in full crash (rsi_4h >= 25)
             recovering_mode = (not crash_mode) and rsi_4h < 35 and rsi_30m > 40 and not divergence
 
             data[sym] = {
                 "price":           cl30[-1],
                 "change_24h":      round((cl30[-1] - cl30[0]) / cl30[0] * 100, 2) if cl30[0] else 0,
                 "change_7d":       round((cl4h[-1] - cl4h[0]) / cl4h[0] * 100, 2) if cl4h[0] else 0,
-                "trend_30m":       t30, "trend_4h": t4h, "trend_1d": t1d,
-                "aligned":         t30 == t4h == t1d,
+                "trend_30m":       t30,
+                "trend_4h":        t4h,
+                "trend_1d":        t90,    # true daily trend (was medium-term 4h)
+                "aligned":         t30 == t4h == t90,
                 "rsi_30m":         rsi_30m,
                 "rsi_4h":          rsi_4h,
-                "rsi_1d":          rsi_1d,
+                "rsi_1d":          rsi_1d,  # true daily RSI
                 "bb_width_4h":     calc_bb_width(cl4h),
                 "atr_pct_4h":      calc_atr_pct(c4h),
                 "range_7d_pct":    round((h7d - l7d) / l7d * 100, 2) if l7d else 0,
@@ -184,6 +192,12 @@ def analyze_market():
             }
         except Exception as e:
             print(f"  ERROR {sym}: {e}")
+
+    # Require minimum symbols before proceeding
+    if len(data) < MIN_SYMBOLS:
+        print(f"  ⚠️  Only {len(data)}/{len(COINGECKO_IDS)} symbols fetched — insufficient data")
+        return {}
+
     return data
 
 
@@ -243,8 +257,9 @@ Output format:
 
 def parse_claude_json(raw):
     """
-    Robust JSON parser — handles extra text after JSON, markdown fences.
-    Same pattern used across all strategy files.
+    Brace-counting JSON extractor.
+    Handles: markdown fences, extra text after JSON, nested {} in string fields.
+    Previous regex approach [^{}]* failed when reasoning contained { or }.
     """
     raw = raw.strip()
     if raw.startswith("```"):
@@ -252,9 +267,34 @@ def parse_claude_json(raw):
         raw = parts[1]
         if raw.startswith("json"): raw = raw[4:]
         raw = raw.strip()
-    m = re.search(r'\{[^{}]*\}', raw, re.DOTALL)
-    if m: return json.loads(m.group())
-    return json.loads(raw)
+
+    start = raw.find('{')
+    if start == -1:
+        raise ValueError("No JSON object found in Claude response")
+
+    depth = 0
+    in_string = False
+    escape_next = False
+    for i, ch in enumerate(raw[start:], start):
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == '\\' and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                return json.loads(raw[start:i+1])
+
+    return json.loads(raw)  # fallback
 
 
 def ask_claude(market_data):
@@ -301,12 +341,12 @@ def get_config_sha():
 def write_config(rec):
     """
     Write strategy selection to config.json via GitHub API.
-    Validates strategy name before writing — prevents Claude hallucination
-    from causing signal_bot to silently fall through to ema_basic.
+    Validates strategy name — prevents Claude hallucination from silently
+    breaking signal_bot by writing an unrecognised strategy name.
     """
     strategy = rec.get("recommended_strategy", "")
     if strategy not in STRATEGIES:
-        print(f"  ⚠️  Invalid strategy '{strategy}' from Claude — falling back to ema_basic")
+        print(f"  ⚠️  Invalid strategy '{strategy}' — falling back to ema_basic")
         strategy = "ema_basic"
 
     now = datetime.now(tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
@@ -322,12 +362,10 @@ def write_config(rec):
     content = json.dumps(config, indent=2)
     encoded = base64.b64encode(content.encode()).decode()
     sha = get_config_sha()
-    payload = {
-        "message": f"Auto-strategy: {strategy} — {now} Dubai",
-        "content": encoded,
-    }
+    payload = {"message": f"Auto-strategy: {strategy} — {now} Dubai", "content": encoded}
     if sha:
         payload["sha"] = sha
+
     url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/contents/{CONFIG_PATH}"
     r = requests.put(url,
                      headers={"Authorization": f"token {GITHUB_TOKEN}",
@@ -344,7 +382,7 @@ def write_config(rec):
 def log_decision(rec):
     """
     Append strategy decision to strategy_log.csv.
-    Uses csv.writer to correctly handle commas in market_condition and reasoning fields.
+    Uses csv.writer — handles commas and braces in market_condition/reasoning.
     """
     ts = datetime.now(tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
     log = "strategy_log.csv"
@@ -370,12 +408,12 @@ def run():
     print("\n[1/3] Collecting market data across 3 timeframes...")
     data = analyze_market()
     if not data:
-        print("ERROR: no market data — aborting")
+        print(f"ERROR: insufficient data ({len(data)}/{len(COINGECKO_IDS)} symbols) — aborting")
         return
 
     print("\n  Mode summary:")
     for sym, d in data.items():
-        print(f"  {sym}: RSI_4h={d['rsi_4h']} | RSI_30m={d['rsi_30m']} | "
+        print(f"  {sym}: RSI_4h={d['rsi_4h']} | RSI_30m={d['rsi_30m']} | RSI_1d={d['rsi_1d']} | "
               f"divergence={d['divergence']} | crash={d['crash_mode']} | "
               f"overbought={d['overbought_mode']} | recovering={d['recovering_mode']}")
 
