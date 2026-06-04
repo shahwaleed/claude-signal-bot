@@ -5,6 +5,8 @@ Strategy: Advanced EMA Crossover
 - EMA 9/21 crossover + RSI-7 filter
 - SAR (Stop-and-Reverse): close opposite position before opening new one
 Log file: trade_log_ema_advanced.csv
+
+Fix: flat market RSI returns 50.0 (neutral) not 100.0
 """
 
 import requests
@@ -32,11 +34,10 @@ SYMBOLS        = ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT"]
 TAKE_PROFIT    = 1.5
 STOP_LOSS      = 3.0
 MIN_CONFIDENCE = 65
-LOG_FILE       = "trade_log_ema_advanced.csv"   # strategy-specific log
+LOG_FILE       = "trade_log_ema_advanced.csv"
 
 open_positions = {s: None for s in ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT"]}
 
-# Column index of webhook_fired in this strategy's own log:
 # timestamp,symbol,price,signal,confidence,ema9_30m,ema21_30m,rsi7_30m,divergence,
 # ema9_4h,ema21_4h,rsi7_4h,trend_4h,webhook_fired,reasoning
 FIRED_COL = 13
@@ -76,10 +77,15 @@ def calculate_ema(closes, period):
 
 
 def calculate_rsi(closes, period=7):
+    """
+    RSI with flat market fix: ag==0 AND al==0 returns 50.0 (neutral).
+    Old code returned 100.0 on flat markets due to al==0 branch firing first.
+    """
     if len(closes)<period+1: return 50.0
     g=[max(closes[i]-closes[i-1],0) for i in range(1,len(closes))]
     l=[max(closes[i-1]-closes[i],0) for i in range(1,len(closes))]
     ag,al=sum(g[-period:])/period,sum(l[-period:])/period
+    if ag==0 and al==0: return 50.0   # flat market → neutral
     if al==0: return 100.0
     if ag==0: return 1.0
     return round(100-(100/(1+ag/al)),2)
@@ -91,9 +97,8 @@ def calculate_rsi_series(closes, period=7):
 
 def detect_divergence(closes, rsi_series, lookback=8):
     """
-    Detect RSI divergence with lookback=8 (4 hours on 30m candles).
-    Increased from 5 to 8 to reduce noise from very short-term moves.
-    Compares current candle against all 7 prior candles in window (rc[:-1]).
+    RSI divergence with lookback=8 (4 hours on 30m candles).
+    Compares current candle against all 7 prior candles (rc[:-1]).
     """
     if len(closes)<lookback or len(rsi_series)<lookback: return None
     rc=closes[-lookback:]; rr=rsi_series[-lookback:]

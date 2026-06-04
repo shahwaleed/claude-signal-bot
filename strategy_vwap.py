@@ -2,6 +2,8 @@
 Strategy: VWAP + EMA Trend Following
 Best for: Trending markets with institutional participation
 Log file: trade_log_vwap.csv
+
+Fix: flat market RSI returns 50.0 (neutral) not 100.0
 """
 
 import requests
@@ -23,17 +25,16 @@ BOT_UUIDS = {
     "SOLUSDT": "3d72a934-50a2-4fd6-bbd2-0e678c841ef4",
     "XRPUSDT": "e798e648-fab5-4b94-82af-052228fa9ed1",
 }
-TICKER_MAP = {"BTCUSDT": "BTCUSDT", "ETHUSDT": "ETHUSDT", "SOLUSDT": "SOLUSDT", "XRPUSDT": "XRPUSDT"}
-COINGECKO_IDS = {"BTCUSDT": "bitcoin", "ETHUSDT": "ethereum", "SOLUSDT": "solana", "XRPUSDT": "ripple"}
-SYMBOLS        = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
+TICKER_MAP = {"BTCUSDT":"BTCUSDT","ETHUSDT":"ETHUSDT","SOLUSDT":"SOLUSDT","XRPUSDT":"XRPUSDT"}
+COINGECKO_IDS = {"BTCUSDT":"bitcoin","ETHUSDT":"ethereum","SOLUSDT":"solana","XRPUSDT":"ripple"}
+SYMBOLS        = ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT"]
 TAKE_PROFIT    = 2.0
 STOP_LOSS      = 3.0
 MIN_CONFIDENCE = 65
-LOG_FILE       = "trade_log_vwap.csv"   # strategy-specific log
+LOG_FILE       = "trade_log_vwap.csv"
 
-open_positions = {s: None for s in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]}
+open_positions = {s: None for s in ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT"]}
 
-# Column index of webhook_fired in this strategy's own log:
 # timestamp,symbol,price,signal,confidence,vwap,price_vs_vwap,ema9,ema21,ema_spread,rsi14,webhook_fired,reasoning
 FIRED_COL = 11
 
@@ -57,11 +58,11 @@ def load_positions_from_log():
 
 def get_candles(symbol, days=1):
     url = f"https://api.coingecko.com/api/v3/coins/{COINGECKO_IDS[symbol]}/ohlc"
-    headers = {"x-cg-demo-api-key": COINGECKO_API_KEY} if COINGECKO_API_KEY else {}
-    r = requests.get(url, params={"vs_currency": "usd", "days": str(days)}, headers=headers, timeout=15)
+    headers = {"x-cg-demo-api-key":COINGECKO_API_KEY} if COINGECKO_API_KEY else {}
+    r = requests.get(url, params={"vs_currency":"usd","days":str(days)}, headers=headers, timeout=15)
     r.raise_for_status()
-    return [{"time": datetime.fromtimestamp(c[0]/1000, tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M"),
-             "open": float(c[1]), "high": float(c[2]), "low": float(c[3]), "close": float(c[4])}
+    return [{"time":datetime.fromtimestamp(c[0]/1000,tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M"),
+             "open":float(c[1]),"high":float(c[2]),"low":float(c[3]),"close":float(c[4])}
             for c in r.json()]
 
 
@@ -72,10 +73,15 @@ def calculate_ema(closes, period):
 
 
 def calculate_rsi(closes, period=14):
+    """
+    RSI with flat market fix: ag==0 AND al==0 returns 50.0 (neutral).
+    Old code returned 100.0 on flat markets due to al==0 branch firing first.
+    """
     if len(closes)<period+1: return 50.0
     g=[max(closes[i]-closes[i-1],0) for i in range(1,len(closes))]
     l=[max(closes[i-1]-closes[i],0) for i in range(1,len(closes))]
     ag,al=sum(g[-period:])/period, sum(l[-period:])/period
+    if ag==0 and al==0: return 50.0   # flat market → neutral
     if al==0: return 100.0
     if ag==0: return 1.0
     return round(100-(100/(1+ag/al)),2)
