@@ -8,10 +8,20 @@ Runs 4x daily aligned to professional trading session opens (Dubai time):
 
 Architecture:
   Writes chosen strategy to config.json which signal_bot.yml reads at runtime.
+
+Fixes applied:
+  1. calc_rsi: flat market returns 50.0 (neutral) not 100.0
+  2. detect_rsi_divergence: inherits flat RSI fix
+  3. crash_mode and recovering_mode made mutually exclusive
+  4. ask_claude: robust JSON parser (handles extra text after JSON)
+  5. log_decision: uses csv.writer (handles commas in market_condition/reasoning)
+  6. write_config: validates strategy name before writing
 """
 
 import requests
 import json
+import re
+import csv
 import os
 import base64
 from datetime import datetime, timezone, timedelta
@@ -44,17 +54,21 @@ def get_ohlc(coin_id, days):
 def calc_ema(closes, p):
     k = 2 / (p + 1)
     e = sum(closes[:p]) / p
-    for c in closes[p:]:
-        e = c * k + e * (1 - k)
+    for c in closes[p:]: e = c * k + e * (1 - k)
     return round(e, 4)
 
 
 def calc_rsi(closes, p=14):
+    """
+    RSI with flat market fix: ag==0 AND al==0 returns 50.0 (neutral).
+    Old code returned 100.0 on flat markets — could trigger SELL override incorrectly.
+    """
     if len(closes) < p + 1:
         return 50.0
     g = [max(closes[i] - closes[i-1], 0) for i in range(1, len(closes))]
     l = [max(closes[i-1] - closes[i], 0) for i in range(1, len(closes))]
     ag, al = sum(g[-p:]) / p, sum(l[-p:]) / p
+    if ag == 0 and al == 0: return 50.0   # flat market → neutral
     if al == 0: return 100.0
     if ag == 0: return 1.0
     return round(100 - (100 / (1 + ag / al)), 2)
@@ -86,12 +100,13 @@ def detect_rsi_divergence(candles_30m):
     Bullish: price making lower low, RSI making higher low (reversal up)
     Bearish: price making higher high, RSI making lower high (reversal down)
     Returns: "bullish", "bearish", or False
+
+    Uses calc_rsi which now correctly returns 50.0 on flat markets.
     """
     if len(candles_30m) < 20:
         return False
     closes = [c[4] for c in candles_30m]
 
-    # Build RSI series
     rsi_series = []
     for i in range(15, len(closes)):
         rsi_series.append(calc_rsi(closes[:i], 14))
@@ -102,13 +117,11 @@ def detect_rsi_divergence(candles_30m):
     recent_price = closes[-1]
     recent_rsi   = rsi_series[-1]
 
-    # Bullish divergence: price lower low, RSI higher low
-    past_price_low = min(closes[-10:-1])
-    past_rsi_low   = min(rsi_series[-10:-1])
+    past_price_low  = min(closes[-10:-1])
+    past_rsi_low    = min(rsi_series[-10:-1])
     if recent_price < past_price_low and recent_rsi > past_rsi_low:
         return "bullish"
 
-    # Bearish divergence: price higher high, RSI lower high
     past_price_high = max(closes[-10:-1])
     past_rsi_high   = max(rsi_series[-10:-1])
     if recent_price > past_price_high and recent_rsi < past_rsi_high:
@@ -139,35 +152,35 @@ def analyze_market():
             rsi_4h  = calc_rsi(cl4h)
             rsi_1d  = calc_rsi(cl1d)
 
-            # Divergence: check both directions on 30m
             divergence = detect_rsi_divergence(c30m)
 
-            # Crash mode: 4h RSI deeply oversold (primary indicator) regardless of 30m bounce
-            # Using 4h as primary because 30m can recover quickly during a dead-cat bounce
+            # Crash mode: 4h RSI deeply oversold, no divergence
             crash_mode = rsi_4h < 25 and not divergence
 
-            # Overbought mode: mirror of crash — 4h RSI deeply overbought
+            # Overbought mode: 4h RSI deeply overbought, no divergence
             overbought_mode = rsi_4h > 75 and not divergence
 
-            # Recovering mode: 30m RSI bounced but 4h still very low — still needs bollinger
-            recovering_mode = rsi_4h < 35 and rsi_30m > 40 and not divergence
+            # Recovering mode: MUTUALLY EXCLUSIVE with crash_mode
+            # 4h RSI in [25,35) — was oversold, starting to recover — still needs bollinger
+            # Only fires when NOT in full crash (rsi_4h >= 25)
+            recovering_mode = (not crash_mode) and rsi_4h < 35 and rsi_30m > 40 and not divergence
 
             data[sym] = {
-                "price":              cl30[-1],
-                "change_24h":         round((cl30[-1] - cl30[0]) / cl30[0] * 100, 2) if cl30[0] else 0,
-                "change_7d":          round((cl4h[-1] - cl4h[0]) / cl4h[0] * 100, 2) if cl4h[0] else 0,
-                "trend_30m":          t30, "trend_4h": t4h, "trend_1d": t1d,
-                "aligned":            t30 == t4h == t1d,
-                "rsi_30m":            rsi_30m,
-                "rsi_4h":             rsi_4h,
-                "rsi_1d":             rsi_1d,
-                "bb_width_4h":        calc_bb_width(cl4h),
-                "atr_pct_4h":         calc_atr_pct(c4h),
-                "range_7d_pct":       round((h7d - l7d) / l7d * 100, 2) if l7d else 0,
-                "divergence":         divergence,   # False, "bullish", or "bearish"
-                "crash_mode":         crash_mode,   # 4h RSI < 25, no divergence
-                "overbought_mode":    overbought_mode,  # 4h RSI > 75, no divergence
-                "recovering_mode":    recovering_mode,  # 30m bounced but 4h still low
+                "price":           cl30[-1],
+                "change_24h":      round((cl30[-1] - cl30[0]) / cl30[0] * 100, 2) if cl30[0] else 0,
+                "change_7d":       round((cl4h[-1] - cl4h[0]) / cl4h[0] * 100, 2) if cl4h[0] else 0,
+                "trend_30m":       t30, "trend_4h": t4h, "trend_1d": t1d,
+                "aligned":         t30 == t4h == t1d,
+                "rsi_30m":         rsi_30m,
+                "rsi_4h":          rsi_4h,
+                "rsi_1d":          rsi_1d,
+                "bb_width_4h":     calc_bb_width(cl4h),
+                "atr_pct_4h":      calc_atr_pct(c4h),
+                "range_7d_pct":    round((h7d - l7d) / l7d * 100, 2) if l7d else 0,
+                "divergence":      divergence,
+                "crash_mode":      crash_mode,
+                "overbought_mode": overbought_mode,
+                "recovering_mode": recovering_mode,
             }
         except Exception as e:
             print(f"  ERROR {sym}: {e}")
@@ -194,14 +207,15 @@ Available strategies and PRECISE conditions for each:
   DO NOT use when trends are bearish — fires SELL signals which fail on Spot.
   DO NOT use when RSI is extreme (< 30 or > 70).
 
-- vwap: Institutional trend following.
-  USE WHEN: same as ema_advanced but price has been consistently one side of VWAP for multiple sessions.
-  Better than ema_advanced during London/NY session overlaps.
+- vwap: Institutional trend following. Better than ema_advanced during London/NY session overlaps.
+  USE WHEN: same bullish alignment as ema_advanced, but price has been one side of VWAP.
+  Prefer vwap when atr_pct_4h is high (strong directional momentum).
+  Prefer ema_advanced when atr_pct_4h is moderate (steady trend).
 
 - rsi_divergence: Reversal detection.
   USE WHEN: divergence="bullish" OR divergence="bearish" for at least 2 assets.
   CRITICAL: ONLY pick this if divergence is actually forming (not just False).
-  If divergence=False for most assets, this strategy will produce zero signals all day — do not pick it.
+  If divergence=False for most assets, this strategy will produce zero signals all day.
 
 - breakout: Momentum breakout.
   USE WHEN: bb_width_4h < 3% for most assets (tight squeeze), low ATR.
@@ -211,18 +225,36 @@ Available strategies and PRECISE conditions for each:
   USE WHEN: nothing else fits. Moderate trend, RSI 40-60, some directional bias.
 
 DECISION RULES (strict priority order):
-1. divergence="bullish" on 2+ assets → rsi_divergence (bullish reversal setup)
-2. divergence="bearish" on 2+ assets → rsi_divergence (bearish reversal setup)
-3. crash_mode=True on 2+ assets → bollinger (4h RSI < 25, RSI override fires BUYs)
-4. overbought_mode=True on 2+ assets → bollinger (4h RSI > 75, RSI override fires SELLs)
-5. recovering_mode=True on 2+ assets → bollinger (4h still depressed, mean reversion still valid)
+1. divergence="bullish" on 2+ assets → rsi_divergence
+2. divergence="bearish" on 2+ assets → rsi_divergence
+3. crash_mode=True on 2+ assets → bollinger (4h RSI < 25)
+4. overbought_mode=True on 2+ assets → bollinger (4h RSI > 75)
+5. recovering_mode=True on 2+ assets → bollinger (4h RSI 25-35, bouncing)
 6. bb_width_4h < 3% on 2+ assets → breakout
-7. trends aligned bullish all timeframes, RSI 40-65 → ema_advanced or vwap
+7. trends aligned bullish all timeframes, RSI 40-65:
+   - atr_pct_4h > 1.5% → vwap (strong momentum)
+   - atr_pct_4h <= 1.5% → ema_advanced (steady trend)
 8. ranging/choppy, mixed trends, RSI 40-60 → bollinger
 9. fallback → ema_basic
 
 Output format:
-{"recommended_strategy":"bollinger","confidence":85,"market_condition":"brief description","reasoning":"One sentence explaining which rule fired and why this strategy will generate signals today","secondary_strategy":"rsi_divergence","key_signals":["signal1","signal2","signal3"]}"""
+{"recommended_strategy":"bollinger","confidence":85,"market_condition":"brief description","reasoning":"One sentence: which rule fired and why this strategy generates signals","secondary_strategy":"rsi_divergence","key_signals":["signal1","signal2","signal3"]}"""
+
+
+def parse_claude_json(raw):
+    """
+    Robust JSON parser — handles extra text after JSON, markdown fences.
+    Same pattern used across all strategy files.
+    """
+    raw = raw.strip()
+    if raw.startswith("```"):
+        parts = raw.split("```")
+        raw = parts[1]
+        if raw.startswith("json"): raw = raw[4:]
+        raw = raw.strip()
+    m = re.search(r'\{[^{}]*\}', raw, re.DOTALL)
+    if m: return json.loads(m.group())
+    return json.loads(raw)
 
 
 def ask_claude(market_data):
@@ -249,11 +281,7 @@ def ask_claude(market_data):
         timeout=30
     )
     resp.raise_for_status()
-    raw = resp.json()["content"][0]["text"].strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"): raw = raw[4:]
-    return json.loads(raw.strip())
+    return parse_claude_json(resp.json()["content"][0]["text"])
 
 
 # ─────────────────────────────────────────
@@ -271,11 +299,21 @@ def get_config_sha():
 
 
 def write_config(rec):
+    """
+    Write strategy selection to config.json via GitHub API.
+    Validates strategy name before writing — prevents Claude hallucination
+    from causing signal_bot to silently fall through to ema_basic.
+    """
+    strategy = rec.get("recommended_strategy", "")
+    if strategy not in STRATEGIES:
+        print(f"  ⚠️  Invalid strategy '{strategy}' from Claude — falling back to ema_basic")
+        strategy = "ema_basic"
+
     now = datetime.now(tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
     config = {
-        "strategy":           rec["recommended_strategy"],
+        "strategy":           strategy,
         "secondary_strategy": rec.get("secondary_strategy", ""),
-        "confidence":         rec["confidence"],
+        "confidence":         rec.get("confidence", 0),
         "market_condition":   rec.get("market_condition", ""),
         "reasoning":          rec.get("reasoning", ""),
         "key_signals":        rec.get("key_signals", []),
@@ -285,7 +323,7 @@ def write_config(rec):
     encoded = base64.b64encode(content.encode()).decode()
     sha = get_config_sha()
     payload = {
-        "message": f"Auto-strategy: {rec['recommended_strategy']} — {now} Dubai",
+        "message": f"Auto-strategy: {strategy} — {now} Dubai",
         "content": encoded,
     }
     if sha:
@@ -296,7 +334,7 @@ def write_config(rec):
                               "Accept": "application/vnd.github.v3+json"},
                      json=payload, timeout=10)
     r.raise_for_status()
-    print(f"  config.json updated: strategy = {rec['recommended_strategy']}")
+    print(f"  config.json updated: strategy = {strategy}")
 
 
 # ─────────────────────────────────────────
@@ -304,17 +342,19 @@ def write_config(rec):
 # ─────────────────────────────────────────
 
 def log_decision(rec):
+    """
+    Append strategy decision to strategy_log.csv.
+    Uses csv.writer to correctly handle commas in market_condition and reasoning fields.
+    """
     ts = datetime.now(tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
     log = "strategy_log.csv"
     header = not os.path.exists(log) or os.path.getsize(log) == 0
-    with open(log, "a") as f:
+    with open(log, "a", newline="") as f:
+        w = csv.writer(f, quoting=csv.QUOTE_MINIMAL)
         if header:
-            f.write("timestamp_dubai,strategy,secondary,confidence,market_condition,reasoning\n")
-        r = rec.get("reasoning", "").replace('"', "'")
-        f.write(
-            f'{ts},{rec["recommended_strategy"]},{rec.get("secondary_strategy","")},'
-            f'{rec["confidence"]},{rec.get("market_condition","")},"{r}"\n'
-        )
+            w.writerow(["timestamp_dubai","strategy","secondary","confidence","market_condition","reasoning"])
+        w.writerow([ts, rec.get("recommended_strategy",""), rec.get("secondary_strategy",""),
+                    rec.get("confidence",""), rec.get("market_condition",""), rec.get("reasoning","")])
 
 
 # ─────────────────────────────────────────
@@ -333,7 +373,6 @@ def run():
         print("ERROR: no market data — aborting")
         return
 
-    # Print mode summary for easy log reading
     print("\n  Mode summary:")
     for sym, d in data.items():
         print(f"  {sym}: RSI_4h={d['rsi_4h']} | RSI_30m={d['rsi_30m']} | "
@@ -342,9 +381,9 @@ def run():
 
     print("\n[2/3] Claude analyzing conditions...")
     rec = ask_claude(data)
-    print(f"\n  Recommended: {rec['recommended_strategy'].upper()}")
+    print(f"\n  Recommended: {rec.get('recommended_strategy','').upper()}")
     print(f"  Secondary:   {rec.get('secondary_strategy','').upper()}")
-    print(f"  Confidence:  {rec['confidence']}%")
+    print(f"  Confidence:  {rec.get('confidence','')}%")
     print(f"  Market:      {rec.get('market_condition','')}")
     print(f"  Reasoning:   {rec.get('reasoning','')}")
     print(f"  Key signals: {rec.get('key_signals',[])}")
