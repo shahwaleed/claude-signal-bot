@@ -1,15 +1,13 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "rsi_divergence",
-  "confidence": 92,
-  "market_condition": "Crash/extreme oversold conditions across multiple assets with 4h RSI deeply depressed",
-  "reasoning": "Rule 3 fired: ETH and SOL both have crash_mode=True with 4h RSI at 15.33 and 14.44 respectively, triggering bollinger hard BUY override for extreme RSI < 25 conditions; BTC and XRP also show 4h RSI near crash levels (14.19 and 23.08).",
+  "secondary_strategy": "ema_basic",
+  "confidence": 90,
+  "market_condition": "Crash and recovering mode across multiple assets with extreme 4h RSI readings",
+  "reasoning": "Rule 3 fired: ETH and SOL both have crash_mode=True (4h RSI 22.59 and 20.86 respectively), and BTC/XRP are in recovering_mode with 4h RSI still deeply suppressed; bollinger has hard RSI overrides that generate reliable BUY signals in these extreme oversold conditions.",
   "key_signals": [
-    "ETH crash_mode=True with 4h RSI=15.33 (extreme oversold)",
-    "SOL crash_mode=True with 4h RSI=14.44 (extreme oversold)",
-    "BTC bullish divergence forming with 4h RSI=14.19",
-    "XRP bullish divergence confirmed with 4h RSI=23.08",
-    "Bollinger lower band BUY override active for all 4 assets"
+    "ETH 4h RSI=22.59 and SOL 4h RSI=20.86 both in crash_mode=True triggering bollinger override",
+    "BTC 4h RSI=25.2 and XRP recovering_mode=True confirm broad market oversold state",
+    "All assets showing wide BB width (14-22%) and high ATR% indicating post-crash volatility suitable for mean reversion entries"
   ],
-  "updated_at_dubai": "2026-06-04 18:01:07"
+  "updated_at_dubai": "2026-06-05 00:01:07"
 }
