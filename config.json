@@ -1,13 +1,15 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "ema_basic",
-  "confidence": 90,
-  "market_condition": "Crash and recovering mode across multiple assets with extreme 4h RSI readings",
-  "reasoning": "Rule 3 fired: ETH and SOL both have crash_mode=True (4h RSI 22.59 and 20.86 respectively), and BTC/XRP are in recovering_mode with 4h RSI still deeply suppressed; bollinger has hard RSI overrides that generate reliable BUY signals in these extreme oversold conditions.",
+  "secondary_strategy": "rsi_divergence",
+  "confidence": 82,
+  "market_condition": "Crash/recovering mode across multiple assets with extreme bearish RSI readings and high volatility",
+  "reasoning": "Rule 3 fires: SOL is in crash_mode=True (4h RSI 24.91), BTC is in recovering_mode=True (4h RSI 33.14), and ETH 4h RSI at 27.02 is near crash territory \u2014 bollinger's hard RSI overrides (<25 BUY trigger) are ideal for capturing mean reversion bounces in these oversold conditions.",
   "key_signals": [
-    "ETH 4h RSI=22.59 and SOL 4h RSI=20.86 both in crash_mode=True triggering bollinger override",
-    "BTC 4h RSI=25.2 and XRP recovering_mode=True confirm broad market oversold state",
-    "All assets showing wide BB width (14-22%) and high ATR% indicating post-crash volatility suitable for mean reversion entries"
+    "SOL crash_mode=True with 4h RSI 24.91 below bollinger lower band trigger",
+    "BTC recovering_mode=True with 4h RSI 33.14 still in oversold recovery zone",
+    "ETH 4h RSI 27.02 approaching crash threshold with 7d loss of -11.55%",
+    "All assets showing bearish 30m+4h trends confirming oversold exhaustion setup",
+    "BB widths extremely wide (14-22%) indicating post-crash volatility ripe for mean reversion"
   ],
-  "updated_at_dubai": "2026-06-05 00:01:07"
+  "updated_at_dubai": "2026-06-05 06:01:04"
 }
