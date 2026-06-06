@@ -338,7 +338,7 @@ def write_config(rec):
     content = json.dumps(config, indent=2)
     encoded = base64.b64encode(content.encode()).decode()
     sha = get_config_sha()
-    payload = {"message": f"Auto-strategy: {strategy} — {now} Dubai", "content\": encoded}
+    payload = {"message": f"Auto-strategy: {strategy} — {now} Dubai", "content": encoded}
     if sha:
         payload["sha"] = sha
     url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/contents/{CONFIG_PATH}"
