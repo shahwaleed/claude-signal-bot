@@ -1,15 +1,15 @@
 {
   "strategy": "bollinger",
   "secondary_strategy": "rsi_divergence",
-  "confidence": 82,
-  "market_condition": "Extreme oversold conditions across multiple assets with avg RSI_4h of 17.8, severe 7-day losses, and crash-like RSI readings",
-  "reasoning": "Rules 1-2 fail (only 2/4 bullish divergence, not 3+); Rule 3 partially applies (XRP crash_mode, ETH/SOL RSI_4h near crash territory); Rule 5 partially applies (BTC recovering_mode); overall extreme oversold market with avg RSI_4h=17.8 firmly triggers bollinger as the default handler for this distressed condition",
+  "confidence": 88,
+  "market_condition": "Deep oversold crash conditions across multiple assets with extreme RSI readings",
+  "reasoning": "Rule 3 fires: ETH has crash_mode=True (RSI_4h=15.49) and SOL/XRP/BTC all have RSI_4h well below 25 or near crash territory, with avg RSI_4h=21.8 indicating severe oversold market \u2014 bollinger mean reversion is the correct response.",
   "key_signals": [
-    "avg RSI_4h=17.8 \u2014 deeply oversold across all assets",
-    "ETH RSI_4h=13.3 and SOL RSI_4h=11.44 near crash-level readings",
-    "XRP in crash_mode with RSI_4h=15.64",
-    "Bullish divergence on ETH and SOL signals potential reversal brewing",
-    "Wide BB bands (13-25%) and high ATR (3-3.5%) confirm high volatility environment"
+    "ETH RSI_4h=15.49 (crash_mode active)",
+    "SOL RSI_4h=12.88 \u2014 extreme oversold",
+    "avg RSI_4h=21.8 across all assets \u2014 deep oversold territory",
+    "Bullish divergence on SOL and XRP but only 2/4 assets \u2014 insufficient for rsi_divergence rule",
+    "BB width 12-25% across assets indicating high volatility suitable for bollinger"
   ],
-  "updated_at_dubai": "2026-06-06 18:01:04"
+  "updated_at_dubai": "2026-06-07 00:01:07"
 }
