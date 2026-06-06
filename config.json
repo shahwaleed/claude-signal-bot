@@ -1,15 +1,15 @@
 {
-  "strategy": "rsi_divergence",
-  "secondary_strategy": "bollinger",
+  "strategy": "bollinger",
+  "secondary_strategy": "rsi_divergence",
   "confidence": 82,
-  "market_condition": "Severe oversold conditions with bullish divergence on 3+ assets (ETH, SOL, XRP) and avg RSI_4h=17.0 well below 50",
-  "reasoning": "Rule 1 fires: bullish divergence confirmed on 3/4 assets (ETH, SOL, XRP) with avg RSI_4h=17.0 far below 50, signaling a high-probability oversold reversal setup.",
+  "market_condition": "Extreme oversold conditions across multiple assets with avg RSI_4h of 17.8, severe 7-day losses, and crash-like RSI readings",
+  "reasoning": "Rules 1-2 fail (only 2/4 bullish divergence, not 3+); Rule 3 partially applies (XRP crash_mode, ETH/SOL RSI_4h near crash territory); Rule 5 partially applies (BTC recovering_mode); overall extreme oversold market with avg RSI_4h=17.8 firmly triggers bollinger as the default handler for this distressed condition",
   "key_signals": [
-    "Bullish divergence on ETH (RSI_4h=13.5), SOL (RSI_4h=11.05), XRP (RSI_4h=16.3) \u2014 3/4 assets confirmed",
-    "Avg RSI_4h=17.0 deeply oversold, well below the 50 threshold required for rule 1",
-    "Extreme ATR across all assets (avg 3.23%) confirms high volatility consistent with capitulation/reversal conditions",
-    "7-day drawdowns of -17% to -23% across assets suggest exhaustion selling",
-    "BTC recovering_mode=True adds confluence that bounce conditions are forming"
+    "avg RSI_4h=17.8 \u2014 deeply oversold across all assets",
+    "ETH RSI_4h=13.3 and SOL RSI_4h=11.44 near crash-level readings",
+    "XRP in crash_mode with RSI_4h=15.64",
+    "Bullish divergence on ETH and SOL signals potential reversal brewing",
+    "Wide BB bands (13-25%) and high ATR (3-3.5%) confirm high volatility environment"
   ],
-  "updated_at_dubai": "2026-06-06 12:02:31"
+  "updated_at_dubai": "2026-06-06 18:01:04"
 }
