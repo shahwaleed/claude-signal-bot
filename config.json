@@ -2,14 +2,12 @@
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
   "confidence": 72,
-  "market_condition": "Mixed/choppy market with bearish 4h trends across all assets, significant 7d drawdowns, no divergences, and misaligned timeframes",
-  "reasoning": "Rule 8 fires: no divergence, crash, overbought, or aligned bullish conditions met; avg RSI 43.7 sits in 35-65 ranging zone with all assets showing timeframe misalignment \u2014 bollinger handles choppy/recovering conditions best",
+  "market_condition": "Choppy, mixed-trend market with recent significant sell-off across all assets, no directional alignment",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, no aligned bullish assets); Rule 8 fires as avg RSI 44.5 falls in 35-65 ranging zone with no dominant trend direction, defaulting to bollinger mean reversion.",
   "key_signals": [
-    "All 4 assets have misaligned trends (30m bullish vs 4h/1d bearish) indicating chop",
-    "Avg RSI_4h=43.7 in mid-range with no directional conviction",
-    "ETH recovering_mode=True with RSI_4h=32.68 near oversold \u2014 watch for mean reversion bounce",
-    "Significant 7d drawdowns (-14% to -21%) suggest volatility remains elevated (avg ATR 2.6%)",
-    "Zero bullish or bearish divergences \u2014 no reversal signal confirmation"
+    "All 4 assets show mixed/conflicting trends (no alignment across timeframes)",
+    "Avg RSI_4h=44.5 in mid-range territory; 7-day losses of 14-20% suggest oversold bounce potential",
+    "High ATR (avg 2.38%) and wide BB widths indicate elevated volatility \u2014 bollinger bands well-suited for mean reversion entries"
   ],
-  "updated_at_dubai": "2026-06-07 18:01:06"
+  "updated_at_dubai": "2026-06-08 00:01:06"
 }
