@@ -1,15 +1,15 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "rsi_divergence",
-  "confidence": 90,
-  "market_condition": "Crash mode on 2+ assets with extreme oversold 4h RSI across the board",
-  "reasoning": "Rule 3 fired: crash_mode=True on 2 assets (ETH RSI_4h=19.91, SOL RSI_4h=22.78), triggering bollinger for mean reversion in distressed market conditions.",
+  "secondary_strategy": "ema_basic",
+  "confidence": 72,
+  "market_condition": "Mixed/choppy market with bearish 4h trends across all assets, significant 7d drawdowns, no divergences, and misaligned timeframes",
+  "reasoning": "Rule 8 fires: no divergence, crash, overbought, or aligned bullish conditions met; avg RSI 43.7 sits in 35-65 ranging zone with all assets showing timeframe misalignment \u2014 bollinger handles choppy/recovering conditions best",
   "key_signals": [
-    "ETH crash_mode: RSI_4h=19.91 deeply oversold",
-    "SOL crash_mode: RSI_4h=22.78 deeply oversold",
-    "Avg RSI_4h=28.2 across all assets \u2014 extreme oversold",
-    "All 4 assets showing 30m bullish momentum bounce attempt",
-    "7d losses of 15-23% across assets suggest capitulation zone"
+    "All 4 assets have misaligned trends (30m bullish vs 4h/1d bearish) indicating chop",
+    "Avg RSI_4h=43.7 in mid-range with no directional conviction",
+    "ETH recovering_mode=True with RSI_4h=32.68 near oversold \u2014 watch for mean reversion bounce",
+    "Significant 7d drawdowns (-14% to -21%) suggest volatility remains elevated (avg ATR 2.6%)",
+    "Zero bullish or bearish divergences \u2014 no reversal signal confirmation"
   ],
-  "updated_at_dubai": "2026-06-07 12:01:03"
+  "updated_at_dubai": "2026-06-07 18:01:06"
 }
