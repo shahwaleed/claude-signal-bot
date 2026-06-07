@@ -1,15 +1,15 @@
 {
   "strategy": "bollinger",
   "secondary_strategy": "rsi_divergence",
-  "confidence": 88,
-  "market_condition": "Deep oversold crash conditions across multiple assets with extreme RSI readings",
-  "reasoning": "Rule 3 fires: ETH has crash_mode=True (RSI_4h=15.49) and SOL/XRP/BTC all have RSI_4h well below 25 or near crash territory, with avg RSI_4h=21.8 indicating severe oversold market \u2014 bollinger mean reversion is the correct response.",
+  "confidence": 95,
+  "market_condition": "Extreme crash mode across majority of assets with RSI_4h averaging 16.7 \u2014 severely oversold",
+  "reasoning": "Rule 3 fired: crash_mode=True on 3/4 assets (ETH, SOL, XRP all RSI_4h below 25), triggering bollinger for mean reversion with RSI override BUY signals.",
   "key_signals": [
-    "ETH RSI_4h=15.49 (crash_mode active)",
-    "SOL RSI_4h=12.88 \u2014 extreme oversold",
-    "avg RSI_4h=21.8 across all assets \u2014 deep oversold territory",
-    "Bullish divergence on SOL and XRP but only 2/4 assets \u2014 insufficient for rsi_divergence rule",
-    "BB width 12-25% across assets indicating high volatility suitable for bollinger"
+    "3/4 assets in crash_mode (ETH RSI_4h=12.47, SOL RSI_4h=7.67, XRP RSI_4h=20.61)",
+    "Avg RSI_4h=16.7 \u2014 extreme oversold territory, well below crash threshold of 25",
+    "7d losses of 17-25% across all assets indicate capitulation conditions",
+    "30m RSI elevated (67-77) showing short-term bounce already underway",
+    "BB width extremely wide (10-24%) confirming high volatility mean reversion setup"
   ],
-  "updated_at_dubai": "2026-06-07 00:01:07"
+  "updated_at_dubai": "2026-06-07 06:01:01"
 }
