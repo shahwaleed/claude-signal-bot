@@ -42,6 +42,13 @@ BOT_UUIDS = {
     "SOLUSDT": "3d72a934-50a2-4fd6-bbd2-0e678c841ef4",
     "XRPUSDT": "e798e648-fab5-4b94-82af-052228fa9ed1",
 }
+# 3Commas expects tv_instrument in "BASE/QUOTE" format
+TV_INSTRUMENTS = {
+    "BTCUSDT": "BTC/USDT",
+    "ETHUSDT": "ETH/USDT",
+    "SOLUSDT": "SOL/USDT",
+    "XRPUSDT": "XRP/USDT",
+}
 COINGECKO_IDS = {"BTCUSDT": "bitcoin", "ETHUSDT": "ethereum",
                   "SOLUSDT": "solana",  "XRPUSDT": "ripple"}
 SYMBOLS     = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
@@ -219,9 +226,6 @@ def had_recent_sl(symbol, hours=6):
                 except ValueError:
                     continue
                 if ts < cutoff: break
-                # A fired webhook that subsequently hit SL
-                # We detect SL by checking if webhook_fired=True and result=sl in log
-                # Simplified: if webhook fired recently on this symbol, treat as potential re-entry
                 if row.get("webhook_fired") == "True" and row.get("result") == "sl":
                     return True
     except Exception:
@@ -241,7 +245,7 @@ def fire_webhook(symbol, price, tp_pct):
         "timestamp":     datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"),
         "trigger_price": str(price),
         "tv_exchange":   "BINANCE",
-        "tv_instrument": symbol,
+        "tv_instrument": TV_INSTRUMENTS[symbol],  # e.g. "SOL/USDT" not "SOLUSDT"
         "action":        "enter_long",
         "bot_uuid":      BOT_UUIDS[symbol],
         "take_profit":   {"enabled": True, "steps": [{"order_type": "market",
@@ -251,7 +255,7 @@ def fire_webhook(symbol, price, tp_pct):
     }
     r = requests.post(WEBHOOK_URL, json=payload, timeout=10)
     ok = r.status_code == 200
-    print(f"  Webhook enter_long: {'SUCCESS' if ok else f'FAILED [{r.status_code}]'} "
+    print(f"  Webhook enter_long {TV_INSTRUMENTS[symbol]}: {'SUCCESS' if ok else f'FAILED [{r.status_code}] {r.text[:100]}'} "
           f"(TP:{tp_pct:.2f}%, SL:{STOP_LOSS}%)")
     return ok
 
