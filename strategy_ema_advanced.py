@@ -7,6 +7,7 @@ Strategy: Advanced EMA Crossover
 Log file: trade_log_ema_advanced.csv
 
 Fix: flat market RSI returns 50.0 (neutral) not 100.0
+Fix: tv_instrument uses slash format (SOL/USDT not SOLUSDT) for 3Commas
 """
 
 import requests
@@ -28,7 +29,13 @@ BOT_UUIDS = {
     "SOLUSDT": "3d72a934-50a2-4fd6-bbd2-0e678c841ef4",
     "XRPUSDT": "e798e648-fab5-4b94-82af-052228fa9ed1",
 }
-TICKER_MAP = {"BTCUSDT":"BTCUSDT","ETHUSDT":"ETHUSDT","SOLUSDT":"SOLUSDT","XRPUSDT":"XRPUSDT"}
+# 3Commas Signal Bots require slash format: "SOL/USDT" not "SOLUSDT"
+TV_INSTRUMENTS = {
+    "BTCUSDT": "BTC/USDT",
+    "ETHUSDT": "ETH/USDT",
+    "SOLUSDT": "SOL/USDT",
+    "XRPUSDT": "XRP/USDT",
+}
 COINGECKO_IDS = {"BTCUSDT":"bitcoin","ETHUSDT":"ethereum","SOLUSDT":"solana","XRPUSDT":"ripple"}
 SYMBOLS        = ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT"]
 TAKE_PROFIT    = 1.5
@@ -38,8 +45,6 @@ LOG_FILE       = "trade_log_ema_advanced.csv"
 
 open_positions = {s: None for s in ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT"]}
 
-# timestamp,symbol,price,signal,confidence,ema9_30m,ema21_30m,rsi7_30m,divergence,
-# ema9_4h,ema21_4h,rsi7_4h,trend_4h,webhook_fired,reasoning
 FIRED_COL = 13
 
 
@@ -77,15 +82,11 @@ def calculate_ema(closes, period):
 
 
 def calculate_rsi(closes, period=7):
-    """
-    RSI with flat market fix: ag==0 AND al==0 returns 50.0 (neutral).
-    Old code returned 100.0 on flat markets due to al==0 branch firing first.
-    """
     if len(closes)<period+1: return 50.0
     g=[max(closes[i]-closes[i-1],0) for i in range(1,len(closes))]
     l=[max(closes[i-1]-closes[i],0) for i in range(1,len(closes))]
     ag,al=sum(g[-period:])/period,sum(l[-period:])/period
-    if ag==0 and al==0: return 50.0   # flat market → neutral
+    if ag==0 and al==0: return 50.0
     if al==0: return 100.0
     if ag==0: return 1.0
     return round(100-(100/(1+ag/al)),2)
@@ -96,10 +97,6 @@ def calculate_rsi_series(closes, period=7):
 
 
 def detect_divergence(closes, rsi_series, lookback=8):
-    """
-    RSI divergence with lookback=8 (4 hours on 30m candles).
-    Compares current candle against all 7 prior candles (rc[:-1]).
-    """
     if len(closes)<lookback or len(rsi_series)<lookback: return None
     rc=closes[-lookback:]; rr=rsi_series[-lookback:]
     if rc[-1]<min(rc[:-1]) and not rr[-1]<min(rr[:-1]): return "bullish"
@@ -175,7 +172,7 @@ def send_close_webhook(symbol, price):
     r=requests.post(WEBHOOK_URL,json={"secret":WEBHOOK_SECRET,"max_lag":"300",
                "timestamp":datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"),
                "trigger_price":str(price),"tv_exchange":"BINANCE",
-               "tv_instrument":TICKER_MAP.get(symbol,symbol),"action":action,
+               "tv_instrument":TV_INSTRUMENTS[symbol],"action":action,
                "bot_uuid":BOT_UUIDS[symbol]},timeout=10)
     if r.status_code==200:
         print(f"  [SAR] Closed {current} for {symbol} ({action})"); open_positions[symbol]=None; return True
@@ -197,7 +194,7 @@ def fire_webhook(signal_str, price, symbol):
     r=requests.post(WEBHOOK_URL,json={"secret":WEBHOOK_SECRET,"max_lag":"300",
                "timestamp":datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"),
                "trigger_price":str(price),"tv_exchange":"BINANCE",
-               "tv_instrument":TICKER_MAP.get(symbol,symbol),"action":action,
+               "tv_instrument":TV_INSTRUMENTS[symbol],"action":action,
                "bot_uuid":BOT_UUIDS[symbol],
                "take_profit":{"enabled":True,"steps":[{"order_type":"market","price_percent":tp,"volume_percent":100}]},
                "stop_loss":{"enabled":True,"order_type":"market","trigger_price_percent":STOP_LOSS}},timeout=10)

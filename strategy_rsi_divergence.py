@@ -7,6 +7,7 @@ Fixes applied:
   1. Flat market RSI returns 50.0 (neutral) not 100.0
   2. Strength uses round() not int() — reduces tier boundary artifacts
   3. Trend-agrees penalty (-10) for lower-quality same-direction signals
+  4. tv_instrument uses slash format (SOL/USDT not SOLUSDT) for 3Commas
 """
 
 import requests, json, re, csv, time, os
@@ -23,7 +24,13 @@ BOT_UUIDS = {
     "SOLUSDT": "3d72a934-50a2-4fd6-bbd2-0e678c841ef4",
     "XRPUSDT": "e798e648-fab5-4b94-82af-052228fa9ed1",
 }
-TICKER_MAP    = {"BTCUSDT":"BTCUSDT","ETHUSDT":"ETHUSDT","SOLUSDT":"SOLUSDT","XRPUSDT":"XRPUSDT"}
+# 3Commas Signal Bots require slash format: "SOL/USDT" not "SOLUSDT"
+TV_INSTRUMENTS = {
+    "BTCUSDT": "BTC/USDT",
+    "ETHUSDT": "ETH/USDT",
+    "SOLUSDT": "SOL/USDT",
+    "XRPUSDT": "XRP/USDT",
+}
 COINGECKO_IDS = {"BTCUSDT":"bitcoin","ETHUSDT":"ethereum","SOLUSDT":"solana","XRPUSDT":"ripple"}
 SYMBOLS        = ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT"]
 TAKE_PROFIT    = 2.5
@@ -42,18 +49,13 @@ def get_candles(symbol, days=7):
 
 
 def calculate_rsi_series(closes, period=14):
-    """
-    Build RSI series over a growing window.
-    FIX 1: flat market (ag=0 AND al=0) returns 50.0 (neutral), not 100.0.
-            The old code hit the al==0 branch first, returning 100.0 incorrectly.
-    """
     vals=[]
     for i in range(period+1, len(closes)+1):
         w=closes[:i]
         g=[max(w[j]-w[j-1],0) for j in range(1,len(w))]
         l=[max(w[j-1]-w[j],0) for j in range(1,len(w))]
         ag,al=sum(g[-period:])/period,sum(l[-period:])/period
-        if ag==0 and al==0: vals.append(50.0)   # flat market → neutral
+        if ag==0 and al==0: vals.append(50.0)
         elif al==0: vals.append(100.0)
         elif ag==0: vals.append(1.0)
         else: vals.append(round(100-(100/(1+ag/al)),2))
@@ -61,12 +63,6 @@ def calculate_rsi_series(closes, period=14):
 
 
 def find_divergence(closes, rs, lb=10):
-    """
-    Detect RSI divergence against all prior candles in the lookback window.
-    FIX 2: strength uses round() not int() — reduces tier boundary sensitivity.
-            int(29.9) = 29 (weak), round(29.9) = 30 (moderate): a 0.01% price
-            difference no longer arbitrarily shifts confidence by 10 points.
-    """
     if len(closes)<lb or len(rs)<lb:
         return {"type":"none","strength":0,"details":"insufficient data"}
     pw=closes[-lb:]; rw=rs[-lb:]
@@ -154,11 +150,11 @@ def fire_webhook(signal_str, price, symbol):
     r=requests.post(WEBHOOK_URL,json={"secret":WEBHOOK_SECRET,"max_lag":"300",
                "timestamp":datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"),
                "trigger_price":str(price),"tv_exchange":"BINANCE",
-               "tv_instrument":TICKER_MAP.get(symbol,symbol),"action":action,
+               "tv_instrument":TV_INSTRUMENTS[symbol],"action":action,
                "bot_uuid":BOT_UUIDS[symbol],
                "take_profit":{"enabled":True,"steps":[{"order_type":"market","price_percent":tp,"volume_percent":100}]},
                "stop_loss":{"enabled":True,"order_type":"market","trigger_price_percent":STOP_LOSS}},timeout=10)
-    print(f"  Webhook {action}: {'SUCCESS' if r.status_code==200 else f'FAILED [{r.status_code}]'} (TP:{tp}%)")
+    print(f"  Webhook {action}: {'SUCCESS' if r.status_code==200 else f'FAILED [{r.status_code}] {r.text[:100]}'} (TP:{tp}%)")
     return r.status_code==200
 
 
