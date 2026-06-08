@@ -2,14 +2,12 @@
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
   "confidence": 72,
-  "market_condition": "Mixed signals: short-term bounce within broader bearish trend, elevated 4h RSI near overbought, no alignment across timeframes",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, zero bullish-aligned assets); Rule 8 fires as ranging/choppy market with avg RSI 4h=67 near upper bound and no directional alignment across timeframes.",
+  "market_condition": "Mixed signals: 30m bullish vs 4h/1d bearish, high ATR, no divergence, no special modes, avg RSI_4h near overbought but no rule triggered",
+  "reasoning": "Rules 1-7 all failed (no divergence, no crash/overbought/recovering modes, zero assets fully aligned bullish); rule 8 applies as default bollinger for choppy/unaligned market conditions.",
   "key_signals": [
-    "All 4 assets: 30m bullish but 4h+1d bearish \u2014 no timeframe alignment",
-    "Avg RSI_4h=67.0 elevated but not triggering overbought_mode (none >75)",
-    "7-day losses of 14-20% suggest bearish macro context with short-term mean-reversion bounce",
-    "ETH 1d RSI=24.58 approaching crash territory but not confirmed on 2+ assets",
-    "Wide BB widths (7-17%) and high ATR indicate volatility, favoring mean-reversion over trend-following"
+    "All 4 assets show 30m bullish vs 4h+1d bearish misalignment \u2014 no directional consensus",
+    "Avg RSI_4h=68.7 approaching overbought but not triggering threshold on 2+ assets",
+    "High avg ATR=2.18% and severe 7-day losses (-11% to -18%) indicate volatile, bearish macro backdrop"
   ],
-  "updated_at_dubai": "2026-06-08 06:01:05"
+  "updated_at_dubai": "2026-06-08 12:01:09"
 }
