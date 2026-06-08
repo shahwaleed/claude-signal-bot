@@ -1,13 +1,15 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "ema_basic",
-  "confidence": 72,
-  "market_condition": "Mixed signals: 30m bullish vs 4h/1d bearish, high ATR, no divergence, no special modes, avg RSI_4h near overbought but no rule triggered",
-  "reasoning": "Rules 1-7 all failed (no divergence, no crash/overbought/recovering modes, zero assets fully aligned bullish); rule 8 applies as default bollinger for choppy/unaligned market conditions.",
+  "secondary_strategy": "rsi_divergence",
+  "confidence": 82,
+  "market_condition": "Overbought 4h RSI across all assets with bearish divergence signals, short-term bounce in oversold daily context",
+  "reasoning": "Rule 4 partially applies (1/4 overbought_mode assets) but avg RSI_4h=73.1 is near overbought territory; no rule 1-5 fully fires with required counts, and zero bullish-aligned assets eliminates rules 6-7, so bollinger is the correct default for this choppy, high-volatility mean-reversion setup",
   "key_signals": [
-    "All 4 assets show 30m bullish vs 4h+1d bearish misalignment \u2014 no directional consensus",
-    "Avg RSI_4h=68.7 approaching overbought but not triggering threshold on 2+ assets",
-    "High avg ATR=2.18% and severe 7-day losses (-11% to -18%) indicate volatile, bearish macro backdrop"
+    "avg RSI_4h=73.1 \u2014 elevated/overbought zone across all assets",
+    "bearish divergence on BTC and SOL (2/4 assets, insufficient for rule 2 trigger)",
+    "ETH overbought_mode=True with RSI_4h=75.34; 1d RSI=24.58 showing extreme daily oversold",
+    "All 4 assets show 30m bullish vs 4h/1d bearish \u2014 misaligned, no trend confirmation",
+    "7d losses of 9-16% across board with short-term bounce \u2014 mean reversion conditions"
   ],
-  "updated_at_dubai": "2026-06-08 12:01:09"
+  "updated_at_dubai": "2026-06-08 18:01:11"
 }
