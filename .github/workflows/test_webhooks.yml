@@ -1,0 +1,18 @@
+name: Test Webhooks
+
+on:
+  workflow_dispatch:  # Manual trigger only — run from GitHub Actions tab
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - name: Fire test webhooks to all 4 bots
+        env:
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: python test_webhooks.py
