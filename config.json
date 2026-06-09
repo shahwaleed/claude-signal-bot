@@ -1,15 +1,13 @@
 {
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
-  "confidence": 78,
-  "market_condition": "Mixed signals with high 4h RSI across assets, bearish 1d trends, and no clear alignment \u2014 choppy/ranging market with overbought 4h momentum fading",
-  "reasoning": "Rule 8 fires: no divergence, no crash/overbought/recovering threshold met (only 1/4 overbought), no bullish alignment \u2014 market is ranging/choppy with avg RSI 40-70 zone mixed, defaulting to bollinger as the catch-all handler",
+  "confidence": 72,
+  "market_condition": "Choppy, misaligned trends with high 4h RSI approaching overbought but no confirmed signals",
+  "reasoning": "No divergence, no crash/overbought/recovering modes triggered, zero assets fully bullish-aligned \u2014 falls through to rule 8/9 with bollinger as default for ranging/unaligned market conditions.",
   "key_signals": [
-    "ETH overbought_mode=True on 4h (RSI 78.88) \u2014 bollinger SELL signal",
-    "SOL and ETH fully bearish aligned on all timeframes with deep 7d losses (-17.45%, -15.53%)",
-    "Avg 4h RSI=73.4 elevated but only 1/4 assets officially overbought \u2014 no confirmation for rule 4",
-    "BTC and XRP 4h bullish but 30m/1d bearish \u2014 no trend alignment across assets",
-    "High BB widths (7-12%) suggest recent volatility with potential mean reversion opportunities"
+    "avg RSI_4h=69.7 \u2014 elevated but not overbought threshold",
+    "0/4 assets bullish-aligned across all timeframes \u2014 no trend confirmation",
+    "7d losses of 9-17% across all assets with short-term bounce signals only"
   ],
-  "updated_at_dubai": "2026-06-09 06:01:07"
+  "updated_at_dubai": "2026-06-09 12:01:04"
 }
