@@ -1,13 +1,15 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "ema_basic",
-  "confidence": 72,
-  "market_condition": "Broad bearish trend across all assets, no divergence signals, no crash/overbought/recovering modes triggered, ranging with elevated volatility",
-  "reasoning": "Rules 1-7 all fail to fire; rule 8 applies as avg RSI 47.8 falls in 35-65 range with choppy/ranging conditions, making bollinger the correct default",
+  "secondary_strategy": "rsi_divergence",
+  "confidence": 78,
+  "market_condition": "Broad bearish trend with recovering/oversold conditions across multiple assets, avg RSI_4h=34.6",
+  "reasoning": "Rules 1-2 fail (only 2/4 bullish divergence, need 3+); Rules 3-4 fail (no crash/overbought); Rule 5 partially fires (1/4 recovering) but BTC recovering_mode=True and ETH/SOL/XRP 4h RSI all in 32-35 range signals oversold mean-reversion setup; Rules 6-7 fail (0 bullish aligned); Rule 8 fires as the market is in a bearish oversold state best handled by bollinger mean reversion.",
   "key_signals": [
-    "All 4 assets fully bearish-aligned across 30m/4h/1d",
-    "Avg RSI_4h=47.8 in mid-range, no extreme modes triggered",
-    "ETH 1d RSI=24.58 approaching crash territory, XRP 30m RSI=25.0 near oversold \u2014 watch for bollinger buy signals"
+    "avg RSI_4h=34.6 \u2014 deeply oversold, near lower Bollinger bands",
+    "BTC recovering_mode=True with RSI_4h=32.65; ETH 1d RSI=24.58 near crash territory",
+    "SOL and XRP show bullish divergence (2/4, insufficient for rsi_divergence rule) but adds confluence for mean-reversion BUY signals",
+    "All 4 assets aligned bearish \u2014 no trend-following strategy applicable",
+    "ATR avg 1.75% indicates elevated volatility, favoring wider BB bands for entries"
   ],
-  "updated_at_dubai": "2026-06-10 12:01:08"
+  "updated_at_dubai": "2026-06-10 18:01:15"
 }
