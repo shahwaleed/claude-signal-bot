@@ -2,12 +2,14 @@
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
   "confidence": 72,
-  "market_condition": "Broad bearish trend across all timeframes, no divergence signals, no extreme modes triggered, choppy/declining market",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, no bullish-aligned assets); Rule 8 fires \u2014 ranging/declining market with avg RSI 48.8 near the 35-65 zone, defaulting to bollinger mean reversion.",
+  "market_condition": "Broadly bearish across all timeframes, no divergence or extreme modes, ranging/choppy with avg RSI near midpoint",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, no bullish-aligned assets); Rule 8 fires as avg RSI 4h is 50.4 (within 35-65 range) in a ranging/choppy market defaulting to bollinger.",
   "key_signals": [
-    "All 4 assets bearish across 30m and 1d timeframes",
-    "Avg RSI_4h=48.8 with no extreme conditions met",
-    "ETH 1d RSI=24.58 approaching crash territory; BTC/SOL/XRP also depressed on daily"
+    "All 4 assets fully bearish-aligned across 30m/4h/1d",
+    "Avg RSI_4h=50.4 \u2014 midzone, no extreme conditions triggered",
+    "ETH 1d RSI=24.58 approaching crash territory but only 1 asset \u2014 insufficient for Rule 3",
+    "XRP 30m RSI=1.0 anomaly suggests potential mean-reversion signal",
+    "ATR% elevated (avg 1.99%) indicating volatility but no bullish trend alignment to exploit"
   ],
-  "updated_at_dubai": "2026-06-10 00:01:08"
+  "updated_at_dubai": "2026-06-10 06:01:05"
 }
