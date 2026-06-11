@@ -1,15 +1,13 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "rsi_divergence",
-  "confidence": 78,
-  "market_condition": "Bearish multi-asset selloff with low RSI levels and partial recovery signals",
-  "reasoning": "Rules 1-2 fail (only 2/4 assets show bullish divergence, need 3+); Rules 3-5 fail (crash/overbought/recovering counts too low); Rules 6-7 fail (0 assets bullish aligned); Rule 8 applies \u2014 avg RSI 33.3 is below ranging zone but bollinger is the default for bearish/recovering conditions not meeting higher-priority thresholds.",
+  "secondary_strategy": "ema_basic",
+  "confidence": 72,
+  "market_condition": "Mixed signals with bearish 4h/1d trends across all assets, misaligned timeframes, avg RSI 41.2 in lower-mid range, no divergences detected",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering on 2+ assets, zero bullish-aligned assets); Rule 8 fires as ranging/choppy market with avg RSI 35-65 and no clear directional alignment",
   "key_signals": [
-    "Avg RSI_4h=33.3 \u2014 deeply oversold territory favoring mean reversion",
-    "ETH recovering_mode=True with 1d RSI=24.58 near crash levels",
-    "SOL and XRP showing bullish divergence (2/4, not enough for rsi_divergence trigger)",
-    "All aligned assets (ETH, SOL, XRP) fully bearish across timeframes",
-    "ATR elevated at 1.81% avg indicating significant volatility \u2014 wide BB bands support bollinger"
+    "All 4 assets show 30m bullish but 4h+1d bearish \u2014 no timeframe alignment",
+    "Avg RSI_4h=41.2 sits in lower-mid range, consistent with ranging/recovering behavior",
+    "XRP recovering_mode alone (1/4) insufficient to trigger bollinger Rule 5; ETH 1d RSI=24.58 approaches crash territory but 4h RSI=44.56 does not confirm"
   ],
-  "updated_at_dubai": "2026-06-11 06:01:15"
+  "updated_at_dubai": "2026-06-11 12:01:09"
 }
