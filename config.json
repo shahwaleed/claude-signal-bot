@@ -2,12 +2,12 @@
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
   "confidence": 72,
-  "market_condition": "Mixed/choppy market with no trend alignment \u2014 all assets show short-term bullish but daily bearish, RSI mid-range",
-  "reasoning": "No divergence, crash, overbought, recovering, or fully aligned bullish signals fired; avg RSI 58.7 falls in 35-65 ranging zone, triggering Rule 8 (bollinger default).",
+  "market_condition": "Mixed signals with no dominant trend \u2014 all assets show conflicting timeframe trends (4h bullish vs 1d bearish), no divergence confirmation, no crash/overbought/recovering modes triggered",
+  "reasoning": "Rules 1-7 all fail to fire: only 1 asset shows bearish divergence (need 3+), no crash/overbought/recovering modes, and 0 assets are fully bullish-aligned; Rule 8 applies as market is ranging/choppy with avg RSI 55.2 in the 35-65 zone, defaulting to bollinger",
   "key_signals": [
-    "0/4 assets fully aligned bullish \u2014 no trend strategy applicable",
-    "avg RSI_4h=58.7 in ranging zone (35-65)",
-    "All assets: 30m/4h bullish but 1d bearish \u2014 conflicted timeframes"
+    "All 4 assets share identical trend conflict: 30m=bearish, 4h=bullish, 1d=bearish \u2014 no alignment",
+    "ETH 1d RSI=10.28 and XRP 1d RSI=21.82 signal extreme daily oversold conditions despite 4h strength",
+    "avg ATR=1.54% near threshold but 0/4 assets bullish-aligned so vwap/ema_advanced cannot trigger"
   ],
-  "updated_at_dubai": "2026-06-12 06:01:03"
+  "updated_at_dubai": "2026-06-12 12:01:05"
 }
