@@ -2,12 +2,12 @@
   "strategy": "bollinger",
   "secondary_strategy": "ema_advanced",
   "confidence": 72,
-  "market_condition": "Mixed trends with no alignment, 1d bearish across all assets, mid-range RSI, ranging/choppy conditions",
-  "reasoning": "No divergence threshold met (only 1 bearish), no crash/overbought/recovering modes triggered, no assets fully aligned bullish \u2014 falls to Rule 8 (ranging/choppy market with avg RSI 35-65) defaulting to bollinger",
+  "market_condition": "Mixed trends with no clear alignment, ranging market with moderate RSI",
+  "reasoning": "Rules 1-7 all fail (insufficient divergence confirmation, no crash/overbought/recovering modes, zero assets fully bullish-aligned across all timeframes), so Rule 8 fires \u2014 choppy/ranging market with avg RSI 58.3 in the 35-65 zone defaults to bollinger.",
   "key_signals": [
-    "0/4 assets bullish-aligned across all timeframes \u2014 1d bearish on all assets",
-    "avg RSI_4h=60.1 in mid-range, no extreme conditions triggered",
-    "Only 1/4 bearish divergence (BTC) \u2014 insufficient for rsi_divergence threshold"
+    "0/4 assets bullish-aligned (1d trend bearish on all assets)",
+    "avg RSI_4h=58.3 in mid-range, no extremes triggered",
+    "Only 1/4 bearish divergence (SOL) \u2014 insufficient for rsi_divergence rule"
   ],
-  "updated_at_dubai": "2026-06-12 18:01:07"
+  "updated_at_dubai": "2026-06-13 00:01:05"
 }
