@@ -2,12 +2,12 @@
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
   "confidence": 72,
-  "market_condition": "Mixed/choppy market with no dominant trend alignment, avg RSI 41.7 in mid-range, short-term bullish bounce against longer-term bearish trend",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering on 2+ assets, no bullish alignment on 3+ assets); Rule 8 fires as ranging/choppy market with avg RSI 35-65 (41.7), defaulting to bollinger mean reversion.",
+  "market_condition": "Mixed/choppy market with no trend alignment \u2014 all assets show short-term bullish but daily bearish, RSI mid-range",
+  "reasoning": "No divergence, crash, overbought, recovering, or fully aligned bullish signals fired; avg RSI 58.7 falls in 35-65 ranging zone, triggering Rule 8 (bollinger default).",
   "key_signals": [
-    "All 4 assets show 30m bullish but 1d bearish \u2014 conflicted multi-timeframe signals",
-    "Avg RSI_4h=41.7 in mid-range, no extremes to trigger special modes",
-    "XRP only recovering_mode asset (1/4), insufficient for Rule 5"
+    "0/4 assets fully aligned bullish \u2014 no trend strategy applicable",
+    "avg RSI_4h=58.7 in ranging zone (35-65)",
+    "All assets: 30m/4h bullish but 1d bearish \u2014 conflicted timeframes"
   ],
-  "updated_at_dubai": "2026-06-12 00:01:13"
+  "updated_at_dubai": "2026-06-12 06:01:03"
 }
