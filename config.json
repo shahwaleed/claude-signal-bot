@@ -1,13 +1,13 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "ema_basic",
+  "secondary_strategy": "ema_advanced",
   "confidence": 72,
-  "market_condition": "Mixed signals with no dominant trend \u2014 all assets show conflicting timeframe trends (4h bullish vs 1d bearish), no divergence confirmation, no crash/overbought/recovering modes triggered",
-  "reasoning": "Rules 1-7 all fail to fire: only 1 asset shows bearish divergence (need 3+), no crash/overbought/recovering modes, and 0 assets are fully bullish-aligned; Rule 8 applies as market is ranging/choppy with avg RSI 55.2 in the 35-65 zone, defaulting to bollinger",
+  "market_condition": "Mixed trends with no alignment, 1d bearish across all assets, mid-range RSI, ranging/choppy conditions",
+  "reasoning": "No divergence threshold met (only 1 bearish), no crash/overbought/recovering modes triggered, no assets fully aligned bullish \u2014 falls to Rule 8 (ranging/choppy market with avg RSI 35-65) defaulting to bollinger",
   "key_signals": [
-    "All 4 assets share identical trend conflict: 30m=bearish, 4h=bullish, 1d=bearish \u2014 no alignment",
-    "ETH 1d RSI=10.28 and XRP 1d RSI=21.82 signal extreme daily oversold conditions despite 4h strength",
-    "avg ATR=1.54% near threshold but 0/4 assets bullish-aligned so vwap/ema_advanced cannot trigger"
+    "0/4 assets bullish-aligned across all timeframes \u2014 1d bearish on all assets",
+    "avg RSI_4h=60.1 in mid-range, no extreme conditions triggered",
+    "Only 1/4 bearish divergence (BTC) \u2014 insufficient for rsi_divergence threshold"
   ],
-  "updated_at_dubai": "2026-06-12 12:01:05"
+  "updated_at_dubai": "2026-06-12 18:01:07"
 }
