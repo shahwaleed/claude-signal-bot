@@ -2,12 +2,12 @@
   "strategy": "bollinger",
   "secondary_strategy": "ema_advanced",
   "confidence": 72,
-  "market_condition": "Mixed trends with no clear alignment, ranging market with moderate RSI",
-  "reasoning": "Rules 1-7 all fail (insufficient divergence confirmation, no crash/overbought/recovering modes, zero assets fully bullish-aligned across all timeframes), so Rule 8 fires \u2014 choppy/ranging market with avg RSI 58.3 in the 35-65 zone defaults to bollinger.",
+  "market_condition": "Mixed/choppy market with conflicting timeframes across all assets, avg RSI mid-range",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, zero bullish-aligned assets); Rule 8 fires as ranging/choppy market with avg RSI 54.9 in 35-65 range, defaulting to bollinger.",
   "key_signals": [
-    "0/4 assets bullish-aligned (1d trend bearish on all assets)",
-    "avg RSI_4h=58.3 in mid-range, no extremes triggered",
-    "Only 1/4 bearish divergence (SOL) \u2014 insufficient for rsi_divergence rule"
+    "All 4 assets show misaligned trends (30m bearish, 4h bullish, 1d bearish) \u2014 no directional conviction",
+    "Avg RSI_4h=54.9 sits in mid-range with no extremes; XRP 30m RSI=100 signals short-term overbought spike",
+    "1d RSI extremely depressed on ETH(10.28), BTC(30.05), XRP(21.82), SOL(27.74) \u2014 daily timeframe still in distress"
   ],
-  "updated_at_dubai": "2026-06-13 00:01:05"
+  "updated_at_dubai": "2026-06-13 06:01:06"
 }
