@@ -2,12 +2,12 @@
   "strategy": "bollinger",
   "secondary_strategy": "ema_advanced",
   "confidence": 72,
-  "market_condition": "Mixed/choppy market with conflicting timeframes across all assets, avg RSI mid-range",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, zero bullish-aligned assets); Rule 8 fires as ranging/choppy market with avg RSI 54.9 in 35-65 range, defaulting to bollinger.",
+  "market_condition": "Mixed signals: short-term bullish momentum but daily bearish trend, avg RSI_4h elevated at 67.8, no assets fully aligned across timeframes",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, zero assets fully bullish-aligned); Rule 8/9 applies \u2014 choppy/unaligned market defaults to bollinger as the safest mean-reversion handler",
   "key_signals": [
-    "All 4 assets show misaligned trends (30m bearish, 4h bullish, 1d bearish) \u2014 no directional conviction",
-    "Avg RSI_4h=54.9 sits in mid-range with no extremes; XRP 30m RSI=100 signals short-term overbought spike",
-    "1d RSI extremely depressed on ETH(10.28), BTC(30.05), XRP(21.82), SOL(27.74) \u2014 daily timeframe still in distress"
+    "All 4 assets unaligned: 30m+4h bullish but 1d bearish \u2014 no directional consensus",
+    "avg RSI_4h=67.8 approaching overbought, SOL at 74.28 and XRP at 70.87 near resistance",
+    "Daily RSI extremely oversold (ETH 1d=10.28, XRP 1d=21.82) suggesting macro downtrend still intact despite short-term bounce"
   ],
-  "updated_at_dubai": "2026-06-13 06:01:06"
+  "updated_at_dubai": "2026-06-13 12:01:06"
 }
