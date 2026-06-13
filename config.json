@@ -1,13 +1,15 @@
 {
-  "strategy": "bollinger",
-  "secondary_strategy": "ema_basic",
-  "confidence": 72,
-  "market_condition": "Mixed signals: short-term bullish momentum but daily trend bearish across all assets, no alignment, avg RSI 65.9 approaching overbought, ranging/choppy conditions",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, 0 assets fully aligned with RSI 40-70); Rule 8 fires as default bollinger for this ranging/mixed market with elevated but not extreme RSI",
+  "strategy": "rsi_divergence",
+  "secondary_strategy": "bollinger",
+  "confidence": 82,
+  "market_condition": "Bearish divergence confirmed on all 4 assets with avg RSI_4h=68.6 (above 50), signaling overbought reversal setup",
+  "reasoning": "Rule 2 fired: bearish divergence on 4/4 assets AND avg RSI_4h=68.6 > 50, confirming overbought reversal signal across the entire market.",
   "key_signals": [
-    "All 4 assets unaligned: 30m+4h bullish but 1d bearish \u2014 no trend confirmation",
-    "Avg RSI_4h=65.9 nearing overbought territory, SOL 4h RSI=69.92 and XRP 4h RSI=70.0",
-    "Avg ATR=1.18% below 1.5% threshold, low volatility confirming choppy/ranging environment"
+    "Bearish divergence on BTC, ETH, SOL, XRP (4/4 assets)",
+    "Avg RSI_4h=68.6 \u2014 elevated and above 50 threshold",
+    "All assets show 1d=bearish trend conflicting with 4h bullish \u2014 classic divergence warning",
+    "SOL and XRP RSI_4h near 72-73, approaching overbought territory",
+    "ATR avg 1.17% moderate \u2014 not a trend breakout environment"
   ],
-  "updated_at_dubai": "2026-06-13 18:01:11"
+  "updated_at_dubai": "2026-06-14 00:01:03"
 }
