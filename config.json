@@ -1,15 +1,13 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "ema_basic",
-  "confidence": 72,
-  "market_condition": "Mixed signals with no dominant trend \u2014 misaligned timeframes, low ATR, ranging conditions",
-  "reasoning": "Rules 1-7 all fail (insufficient divergence count, no crash/overbought/recovering modes, zero fully aligned assets); Rule 8 fires as avg RSI 60.7 falls within 35-65 range with choppy, misaligned market structure.",
+  "secondary_strategy": "rsi_divergence",
+  "confidence": 75,
+  "market_condition": "Mixed/ranging market with no dominant trend alignment, avg RSI 58.1, low ATR across all assets",
+  "reasoning": "Rules 1-7 all fail (insufficient divergence count, no crash/overbought/recovering modes, zero assets fully bullish-aligned); Rule 8 fires as ranging/choppy market with avg RSI 35-65.",
   "key_signals": [
-    "Zero assets fully aligned across 30m+4h+1d timeframes",
-    "Only 1/4 assets showing bearish divergence (SOL) \u2014 insufficient for rsi_divergence",
-    "Avg ATR 0.94% well below 1.5% threshold, low volatility ranging environment",
-    "ETH 1d RSI=10.28 and SOL 1d RSI=27.74 suggest daily downtrend pressure despite 4h bullishness",
-    "BTC 4h RSI=68.71 approaching overbought on shorter timeframe \u2014 watch for reversal"
+    "0/4 assets bullish-aligned across all timeframes \u2014 1d=bearish on all assets",
+    "avg ATR 0.92% well below 1.5% threshold, confirming low-volatility ranging environment",
+    "BTC RSI_4h at 70.99 approaching overbought while ETH 1d RSI at 10.28 signals extreme oversold divergence within the group"
   ],
-  "updated_at_dubai": "2026-06-14 12:01:09"
+  "updated_at_dubai": "2026-06-14 18:01:04"
 }
