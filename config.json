@@ -1,15 +1,13 @@
 {
-  "strategy": "rsi_divergence",
-  "secondary_strategy": "bollinger",
-  "confidence": 82,
-  "market_condition": "Bearish divergence confirmed on all 4 assets with avg RSI_4h=68.6 (above 50), signaling overbought reversal setup",
-  "reasoning": "Rule 2 fired: bearish divergence on 4/4 assets AND avg RSI_4h=68.6 > 50, confirming overbought reversal signal across the entire market.",
+  "strategy": "bollinger",
+  "secondary_strategy": "rsi_divergence",
+  "confidence": 78,
+  "market_condition": "Overbought short-term momentum with bearish daily trend; avg RSI_4h=71.8 near overbought territory, no strategy trigger thresholds met cleanly",
+  "reasoning": "Rules 1-7 all fail (bearish divergence only on 2/4 assets, no crash/overbought/recovering modes, 0 assets fully bullish-aligned in RSI 40-70 range); Rule 8/9 defaults to bollinger as RSI is elevated and market is choppy with 30m/4h bullish but 1d bearish across all assets.",
   "key_signals": [
-    "Bearish divergence on BTC, ETH, SOL, XRP (4/4 assets)",
-    "Avg RSI_4h=68.6 \u2014 elevated and above 50 threshold",
-    "All assets show 1d=bearish trend conflicting with 4h bullish \u2014 classic divergence warning",
-    "SOL and XRP RSI_4h near 72-73, approaching overbought territory",
-    "ATR avg 1.17% moderate \u2014 not a trend breakout environment"
+    "BTC RSI_4h=77.0 and XRP RSI_30m=100 signal extreme short-term overbought conditions",
+    "All 4 assets show 1d=bearish trend conflicting with short-term bullish momentum",
+    "Bearish divergence on BTC and SOL (2/4) approaching but not meeting 3-asset threshold for rsi_divergence trigger"
   ],
-  "updated_at_dubai": "2026-06-14 00:01:03"
+  "updated_at_dubai": "2026-06-14 06:01:04"
 }
