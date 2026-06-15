@@ -1,15 +1,15 @@
 {
-  "strategy": "bollinger",
-  "secondary_strategy": "rsi_divergence",
+  "strategy": "rsi_divergence",
+  "secondary_strategy": "bollinger",
   "confidence": 82,
-  "market_condition": "4h RSI extremely overbought across all assets (avg 76.1) with bearish divergence signals, but 1d RSI deeply oversold \u2014 mixed timeframe conflict favoring mean reversion",
-  "reasoning": "No rule 1-2 fires (only 2/4 bearish divergence, need 3+); rules 3-5 don't apply; rules 6-7 fail (0 assets bullish-aligned in RSI 40-70); rule 8 fires as default bollinger given overbought 4h RSI and no aligned trend conditions",
+  "market_condition": "Bearish divergence across 3+ assets with avg RSI_4h well above 50, signaling overbought reversal risk after sharp short-term rallies",
+  "reasoning": "Rule 2 fired: bearish divergence confirmed on 3/4 assets (BTC, ETH, XRP) with avg RSI_4h=79.0 far above 50, indicating overbought reversal setup",
   "key_signals": [
-    "avg RSI_4h=76.1 \u2014 deeply overbought on 4h, SELL signal via bollinger override",
-    "BTC 4h RSI=77.26 and SOL 4h RSI=77.4 approaching RSI>75 override territory",
-    "1d RSI extremely low (ETH=10.28, XRP=21.82) \u2014 massive timeframe divergence signals caution",
-    "Bearish divergence on BTC and SOL (2/4) \u2014 not enough for rsi_divergence rule but adds bearish weight",
-    "No assets aligned bullish across all timeframes \u2014 1d trend bearish on all four assets"
+    "Bearish divergence on BTC (RSI_4h=77.04), ETH (RSI_4h=80.9), XRP (RSI_4h=77.78)",
+    "Avg RSI_4h=79.0 \u2014 deeply overbought on 4h timeframe",
+    "All 4 assets show 1d=bearish trend despite strong 24h rallies (ETH+9.24%, SOL+9.16%, XRP+9.73%) \u2014 classic pump into resistance",
+    "SOL overbought_mode=True, ETH 30m RSI=90.29 \u2014 extreme short-term exhaustion",
+    "Sharp rallies on bearish daily trend = counter-trend bounces likely topping out"
   ],
-  "updated_at_dubai": "2026-06-15 12:01:15"
+  "updated_at_dubai": "2026-06-15 18:01:13"
 }
