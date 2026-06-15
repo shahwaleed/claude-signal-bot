@@ -1,13 +1,15 @@
 {
-  "strategy": "bollinger",
-  "secondary_strategy": "ema_basic",
-  "confidence": 72,
-  "market_condition": "Mixed/choppy market with no clear alignment, avg RSI near midpoint, low ATR",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, zero bullish-aligned assets); Rule 8 fires \u2014 ranging/choppy market with avg RSI 51.2 in 35-65 zone defaults to bollinger.",
+  "strategy": "rsi_divergence",
+  "secondary_strategy": "bollinger",
+  "confidence": 82,
+  "market_condition": "Bearish divergence on all 4 assets with avg RSI_4h at 75.0 (overbought zone), short-term bullish momentum diverging from daily bearish trend",
+  "reasoning": "Rule 2 fired: bearish divergence confirmed on 4/4 assets AND avg RSI_4h = 75.0 > 50, signaling a high-probability reversal setup.",
   "key_signals": [
-    "All 4 assets show bearish 30m trends with no bullish alignment across timeframes",
-    "Avg RSI_4h=51.2 sits in ranging zone (35-65), avg ATR=0.88% well below 1.5% threshold",
-    "BTC 30m RSI=23.14 triggers bollinger BUY override; ETH 1d RSI=10.28 extremely oversold"
+    "Bearish divergence on BTC, ETH, SOL, XRP \u2014 all 4 assets confirmed",
+    "Avg RSI_4h = 75.0, overbought territory supporting bearish reversal signal",
+    "30m RSI extremely overbought (80-86 range) across all assets while 1d RSI deeply oversold (10-30), classic short-term vs long-term divergence",
+    "ATR low (0.96% avg) suggesting momentum exhaustion rather than trend continuation",
+    "All assets show 30m+4h bullish but 1d bearish \u2014 misalignment confirms unsustainable short-term push"
   ],
-  "updated_at_dubai": "2026-06-15 00:01:02"
+  "updated_at_dubai": "2026-06-15 06:01:05"
 }
