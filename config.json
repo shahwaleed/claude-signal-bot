@@ -1,15 +1,15 @@
 {
-  "strategy": "rsi_divergence",
-  "secondary_strategy": "bollinger",
-  "confidence": 82,
-  "market_condition": "Bearish divergence across 3+ assets with avg RSI_4h well above 50, signaling overbought reversal risk after sharp short-term rallies",
-  "reasoning": "Rule 2 fired: bearish divergence confirmed on 3/4 assets (BTC, ETH, XRP) with avg RSI_4h=79.0 far above 50, indicating overbought reversal setup",
+  "strategy": "bollinger",
+  "secondary_strategy": "rsi_divergence",
+  "confidence": 90,
+  "market_condition": "Overbought across multiple assets with 4h RSI averaging 82.9, short-term bullish momentum but daily trend bearish",
+  "reasoning": "Rule 4 fired: overbought_mode=True on 3/4 assets (ETH, SOL, XRP all RSI_4h > 75), triggering bollinger mean reversion strategy.",
   "key_signals": [
-    "Bearish divergence on BTC (RSI_4h=77.04), ETH (RSI_4h=80.9), XRP (RSI_4h=77.78)",
-    "Avg RSI_4h=79.0 \u2014 deeply overbought on 4h timeframe",
-    "All 4 assets show 1d=bearish trend despite strong 24h rallies (ETH+9.24%, SOL+9.16%, XRP+9.73%) \u2014 classic pump into resistance",
-    "SOL overbought_mode=True, ETH 30m RSI=90.29 \u2014 extreme short-term exhaustion",
-    "Sharp rallies on bearish daily trend = counter-trend bounces likely topping out"
+    "overbought_mode on 3/4 assets (ETH RSI 86.69, SOL 83.98, XRP 80.95)",
+    "avg RSI_4h=82.9 well above overbought threshold",
+    "daily trend bearish on all 4 assets despite short-term surge",
+    "BTC bearish divergence detected on 4h",
+    "ATR avg 1.23% \u2014 low volatility supports mean reversion over trend following"
   ],
-  "updated_at_dubai": "2026-06-15 18:01:13"
+  "updated_at_dubai": "2026-06-16 00:01:22"
 }
