@@ -1,13 +1,13 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "ema_basic",
+  "secondary_strategy": "ema_advanced",
   "confidence": 72,
-  "market_condition": "Mixed trends, no clear alignment, avg RSI 4h near overbought at 69.9, choppy across timeframes",
-  "reasoning": "No divergence, crash, overbought, or recovering modes triggered; no assets fully aligned bullish with RSI 40-70; market is ranging/mixed so Rule 8 fires defaulting to bollinger",
+  "market_condition": "Mixed trends with no alignment, avg RSI_4h elevated at 69.3 near overbought, no special modes triggered",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, zero assets fully aligned bullish with RSI 40-70); Rule 8 fires as ranging/choppy market default since no conditions fit higher-priority rules.",
   "key_signals": [
-    "avg RSI_4h=69.9 approaching overbought but not confirmed on 2+ assets",
-    "0/4 assets bullish-aligned across all timeframes \u2014 no trend strategy applicable",
-    "ATR avg 1.66% elevated but alignment condition not met"
+    "avg RSI_4h=69.3 approaching overbought but no asset exceeds 75",
+    "All 4 assets show 30m/4h bullish but 1d bearish \u2014 no full alignment",
+    "ATR avg 1.59% indicates moderate volatility, but alignment requirement not met"
   ],
-  "updated_at_dubai": "2026-06-16 12:01:09"
+  "updated_at_dubai": "2026-06-16 18:01:22"
 }
