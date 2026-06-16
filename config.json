@@ -1,15 +1,13 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "rsi_divergence",
-  "confidence": 90,
-  "market_condition": "Overbought across multiple assets with 4h RSI averaging 82.9, short-term bullish momentum but daily trend bearish",
-  "reasoning": "Rule 4 fired: overbought_mode=True on 3/4 assets (ETH, SOL, XRP all RSI_4h > 75), triggering bollinger mean reversion strategy.",
+  "secondary_strategy": "ema_advanced",
+  "confidence": 72,
+  "market_condition": "Mixed signals with very low 30m RSI across multiple assets despite bullish 4h trends \u2014 no rule 1-7 fires cleanly",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, no fully aligned bullish assets in RSI 40-70 range); falling to Rule 8/9 with bollinger as default, supported by extremely oversold 30m RSI on XRP (14.29), ETH (19.44), BTC (27.01) signaling short-term mean reversion opportunity",
   "key_signals": [
-    "overbought_mode on 3/4 assets (ETH RSI 86.69, SOL 83.98, XRP 80.95)",
-    "avg RSI_4h=82.9 well above overbought threshold",
-    "daily trend bearish on all 4 assets despite short-term surge",
-    "BTC bearish divergence detected on 4h",
-    "ATR avg 1.23% \u2014 low volatility supports mean reversion over trend following"
+    "30m RSI deeply oversold on XRP (14.29), ETH (19.44), BTC (27.01) \u2014 bollinger BUY override triggers",
+    "4h RSI elevated (avg 69.8) suggesting 4h trend still bullish but nearing resistance",
+    "No aligned bullish assets across all timeframes \u2014 choppy/conflicted market favors mean reversion over trend following"
   ],
-  "updated_at_dubai": "2026-06-16 00:01:22"
+  "updated_at_dubai": "2026-06-16 06:01:06"
 }
