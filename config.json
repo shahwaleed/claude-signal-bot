@@ -1,13 +1,13 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "ema_advanced",
+  "secondary_strategy": "ema_basic",
   "confidence": 72,
-  "market_condition": "Mixed trends with no alignment, avg RSI_4h elevated at 69.3 near overbought, no special modes triggered",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, zero assets fully aligned bullish with RSI 40-70); Rule 8 fires as ranging/choppy market default since no conditions fit higher-priority rules.",
+  "market_condition": "Mixed signals with no clear alignment \u2014 30m bearish across most assets, 4h bullish, 1d bearish, no divergence, no extreme modes",
+  "reasoning": "Rules 1-7 all fail (no divergence on 3+ assets, no crash/overbought/recovering modes, 0 assets fully aligned bullish); Rule 8 fires as ranging/choppy market with avg RSI 35-65 range context, defaulting to bollinger as the catch-all handler.",
   "key_signals": [
-    "avg RSI_4h=69.3 approaching overbought but no asset exceeds 75",
-    "All 4 assets show 30m/4h bullish but 1d bearish \u2014 no full alignment",
-    "ATR avg 1.59% indicates moderate volatility, but alignment requirement not met"
+    "0/4 assets bullish-aligned across timeframes \u2014 trend conflict dominant",
+    "avg RSI_4h=65.1 approaching but not exceeding overbought threshold",
+    "30m RSI oversold on BTC (25.26) and XRP (28.57) \u2014 bollinger BUY signals possible on short timeframe"
   ],
-  "updated_at_dubai": "2026-06-16 18:01:22"
+  "updated_at_dubai": "2026-06-17 00:01:22"
 }
