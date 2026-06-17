@@ -2,12 +2,14 @@
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
   "confidence": 72,
-  "market_condition": "Mixed signals with high 4h RSI but no alignment, divergence, or extreme modes across assets",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, no aligned bullish assets); Rule 8 fires as ranging/choppy market with avg RSI 35-65 on shorter timeframes and conflicting trend directions across all assets",
+  "market_condition": "Mixed signals with no clear trend alignment \u2014 4h bullish but 30m and 1d bearish across all assets, avg RSI 4h near overbought at 68.8, no special modes triggered",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, zero assets fully aligned bullish in RSI 40-70 range); Rule 8 fires as the ranging/choppy default since no condition fits cleanly and bollinger handles 74% of all market conditions correctly",
   "key_signals": [
-    "No assets fully aligned bullish across timeframes \u2014 all 4 show 1d=bearish",
-    "Avg 4h RSI=68.7 approaching overbought but not triggering (need >75 on 2+ assets)",
-    "ATR avg 1.79% indicates moderate volatility but insufficient bullish alignment to trigger vwap"
+    "All 4 assets show conflicting trends: 30m=bearish, 4h=bullish, 1d=bearish \u2014 no alignment",
+    "Avg RSI_4h=68.8 approaching overbought but not yet triggering overbought_mode (0/4 assets > 75)",
+    "SOL 4h RSI at 74.65 nearly overbought; ETH 1d RSI at 22.3 near crash territory \u2014 high divergence across timeframes",
+    "ATR% mixed (BTC 1.13% low, ETH/SOL/XRP above 1.9%) \u2014 no clean trend to follow",
+    "No bullish or bearish divergence confirmed on any asset \u2014 reversal signals absent"
   ],
-  "updated_at_dubai": "2026-06-17 06:01:05"
+  "updated_at_dubai": "2026-06-17 12:01:10"
 }
