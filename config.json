@@ -1,13 +1,13 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "ema_basic",
+  "secondary_strategy": "ema_advanced",
   "confidence": 72,
-  "market_condition": "Mixed signals with no alignment \u2014 all 4 assets show 30m bearish vs 4h bullish conflict, avg RSI near 50 with ranging conditions",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, zero bullish-aligned assets); Rule 8 fires \u2014 ranging/choppy market with avg RSI 50.4 sitting in the 35-65 zone defaults to bollinger",
+  "market_condition": "Mixed signals with 4h bullish but 1d bearish across all assets, choppy mid-range RSI, no strong directional alignment",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, no fully aligned assets); Rule 8 fires as ranging/choppy market with avg RSI 35-65 (56.7), defaulting to bollinger mean reversion.",
   "key_signals": [
-    "All 4 assets unaligned: 30m=bearish, 4h=bullish, 1d=bearish \u2014 no directional consensus",
-    "avg RSI_4h=50.4 in ranging zone, avg ATR=1.68% insufficient for vwap trigger without alignment",
-    "SOL 30m RSI=25.59 and ETH 1d RSI=22.3 near oversold \u2014 bollinger BUY signals likely on lower band touches"
+    "All 4 assets unaligned: 4h bullish but 1d bearish \u2014 no trend confirmation",
+    "Avg RSI_4h=56.7 in mid-range, avg ATR=1.74% \u2014 moderate volatility but no directional consensus",
+    "No divergence, crash, overbought, or recovering conditions detected across any asset"
   ],
-  "updated_at_dubai": "2026-06-17 18:01:15"
+  "updated_at_dubai": "2026-06-18 00:01:20"
 }
