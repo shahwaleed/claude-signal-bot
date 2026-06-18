@@ -2,12 +2,12 @@
   "strategy": "rsi_divergence",
   "secondary_strategy": "bollinger",
   "confidence": 82,
-  "market_condition": "Bullish divergence on 3+ assets with oversold RSI_4h conditions",
-  "reasoning": "Rule 1 fires: bullish divergence confirmed on BTC, SOL, and XRP (3/4 assets) with avg RSI_4h=33.8 well below 50, signaling oversold reversal setup.",
+  "market_condition": "Bullish divergence across all 4 assets with deeply oversold RSI conditions (avg 4h RSI 25.5)",
+  "reasoning": "Rule 1 fires: bullish divergence confirmed on 4/4 assets AND avg RSI_4h=25.5 < 50, signaling high-probability oversold reversal.",
   "key_signals": [
-    "Bullish divergence on BTC (RSI_4h=31.22), SOL (RSI_4h=35.58), XRP (RSI_4h=29.41)",
-    "Avg RSI_4h=33.8 \u2014 deeply oversold, confirming reversal signal validity",
-    "All assets showing 7d positive returns (BTC +2.14%, ETH +6.17%, SOL +8.27%, XRP +4.5%) despite short-term bearish pressure"
+    "Bullish divergence on all 4 assets (BTC, ETH, SOL, XRP)",
+    "Avg 4h RSI=25.5 \u2014 deeply oversold, near crash territory",
+    "XRP 30m RSI=1.0 and SOL 30m RSI=20.79 indicate extreme short-term exhaustion"
   ],
-  "updated_at_dubai": "2026-06-18 18:01:20"
+  "updated_at_dubai": "2026-06-19 00:01:07"
 }
