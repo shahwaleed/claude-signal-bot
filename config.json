@@ -1,13 +1,13 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "ema_advanced",
-  "confidence": 72,
-  "market_condition": "Mixed signals with 4h bullish but 1d bearish across all assets, choppy mid-range RSI, no strong directional alignment",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, no fully aligned assets); Rule 8 fires as ranging/choppy market with avg RSI 35-65 (56.7), defaulting to bollinger mean reversion.",
+  "secondary_strategy": "ema_basic",
+  "confidence": 88,
+  "market_condition": "Recovering mode across 3/4 assets with deeply oversold RSI_4h levels (avg 29.5), broad bearish short-term pressure",
+  "reasoning": "Rule 5 fired: recovering_mode=True on 3 assets (ETH, SOL, XRP), triggering bollinger for mean-reversion on depressed RSI levels near oversold zones",
   "key_signals": [
-    "All 4 assets unaligned: 4h bullish but 1d bearish \u2014 no trend confirmation",
-    "Avg RSI_4h=56.7 in mid-range, avg ATR=1.74% \u2014 moderate volatility but no directional consensus",
-    "No divergence, crash, overbought, or recovering conditions detected across any asset"
+    "3/4 assets in recovering_mode (RSI_4h 25-35 range)",
+    "Avg RSI_4h=29.5 \u2014 deeply oversold, near crash territory",
+    "BTC RSI_4h=27.6 approaching crash threshold, supporting mean-reversion bias"
   ],
-  "updated_at_dubai": "2026-06-18 00:01:20"
+  "updated_at_dubai": "2026-06-18 06:01:04"
 }
