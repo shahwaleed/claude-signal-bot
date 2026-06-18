@@ -2,12 +2,10 @@
 test_webhooks.py
 Fires a real enter_long webhook to all 4 bots using current market prices.
 
-This version sends the BARE MINIMUM payload — exactly matching the JSON
-template shown in the 3Commas bot settings, with NO take_profit or stop_loss
-fields. This tests whether those extra fields are causing silent rejection.
+This version uses the EXACT payload format from the last working commit
+(fa56167e, June 8 08:01) — including take_profit and stop_loss fields.
 
 Run manually from GitHub Actions: Actions tab -> Test Webhooks -> Run workflow
-Or locally: python3 test_webhooks.py
 
 NOTE: tv_instrument = raw symbol (BTCUSDT), NOT slash format (BTC/USDT).
       Slash format is 3Commas UI display only. This must never be changed.
@@ -32,6 +30,8 @@ COINGECKO_IDS = {
     "SOLUSDT": "solana",
     "XRPUSDT": "ripple",
 }
+STOP_LOSS = 3.0
+TP_PCT    = 2.5  # fixed TP for test signals
 
 
 def get_current_price(symbol):
@@ -43,7 +43,8 @@ def get_current_price(symbol):
 
 
 print("\n" + "="*60)
-print("3Commas Webhook Test — MINIMAL PAYLOAD (no TP/SL)")
+print("3Commas Webhook Test — RESTORED WORKING PAYLOAD")
+print("Payload: with take_profit + stop_loss (as per fa56167e)")
 print("="*60)
 print(f"Timestamp: {datetime.now(tz=timezone(timedelta(hours=4))).strftime('%Y-%m-%d %H:%M:%S')} Dubai")
 print()
@@ -61,22 +62,18 @@ for symbol in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]:
         prices[symbol] = None
 
 print()
-print("Firing enter_long (bare minimum payload) to all 4 bots...")
-print("Payload fields: secret, max_lag, timestamp, trigger_price,")
-print("                tv_exchange, tv_instrument, action, bot_uuid")
-print("NO take_profit or stop_loss fields sent.")
+print("Firing enter_long to all 4 bots (with TP/SL)...")
 print()
 
 results = []
 for symbol in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]:
     price = prices.get(symbol)
-
     if price is None:
         print(f"  {symbol}: SKIPPED — could not fetch price")
         results.append((symbol, False, 0, "price fetch failed"))
         continue
 
-    # Bare minimum — exactly matches the JSON template in 3Commas bot settings
+    # Exact payload from last working commit fa56167e
     payload = {
         "secret":        WEBHOOK_SECRET,
         "max_lag":       "300",
@@ -86,6 +83,10 @@ for symbol in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]:
         "tv_instrument": symbol,
         "action":        "enter_long",
         "bot_uuid":      BOT_UUIDS[symbol],
+        "take_profit":   {"enabled": True, "steps": [{"order_type": "market",
+                           "price_percent": TP_PCT, "volume_percent": 100}]},
+        "stop_loss":     {"enabled": True, "order_type": "market",
+                          "trigger_price_percent": STOP_LOSS},
     }
 
     try:
@@ -96,7 +97,7 @@ for symbol in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]:
         result = "SUCCESS" if ok else f"FAILED [{status}]"
         print(f"  {symbol} @ ${price:,.4f}: {result}")
         if body:
-            print(f"    Response body: {body}")
+            print(f"    Response: {body}")
         results.append((symbol, ok, status, body))
     except Exception as e:
         print(f"  {symbol}: ERROR — {e}")
@@ -108,17 +109,15 @@ passed = sum(1 for _, ok, _, _ in results if ok)
 print(f"Results: {passed}/{len(results)} bots responded with 200 OK")
 print("="*60)
 print()
-print("What to check in 3Commas after this run:")
-print("  ✅ Signal counter went UP + trade opened = minimal payload works")
-print("  ✅ Signal counter went UP + 'Rejected' = bot busy, but signal received")
-print("  ❌ Signal counter still flat = deeper issue (wrong exchange/instrument)")
-print()
-print("Run diagnose_3commas.py immediately after to check signal counters.")
+print("Check in 3Commas Signal Bot -> Signals tab:")
+print("  ✅ Counter went above 574 = signal reached source = payload works")
+print("  ✅ 'Rejected' in list = signal received but bot busy (still a win)")
+print("  ❌ Counter still 574 = signal still not reaching source")
 
 non200 = [(s, status, body) for s, _, status, body in results if status != 200]
 if non200:
     print()
-    print("❌ HTTP errors detected:")
+    print("❌ HTTP errors:")
     for sym, status, body in non200:
         print(f"  {sym}: [{status}] {body[:100]}")
     exit(1)
