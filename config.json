@@ -1,13 +1,13 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "ema_basic",
+  "secondary_strategy": "ema_advanced",
   "confidence": 88,
-  "market_condition": "Recovering mode across 3/4 assets with deeply oversold 4h RSI averaging 27.2",
-  "reasoning": "Rule 5 fired: recovering_mode=True on 3 assets (BTC, SOL, XRP) with avg RSI_4h at 27.2, well below 35, confirming mean reversion setup favoring bollinger",
+  "market_condition": "Recovering mode across all 4 assets with 4h RSI deeply oversold (avg 33.1), short-term bullish momentum conflicting with bearish 4h/1d trends",
+  "reasoning": "Rule 5 fires: recovering_mode=True on 4/4 assets (RSI_4h 25-35 range), which mandates bollinger for mean reversion as prices recover from oversold conditions",
   "key_signals": [
-    "recovering_mode active on BTC/SOL/XRP with 4h RSI all near 27",
-    "avg 4h RSI=27.2 deeply oversold, price near/below lower Bollinger bands",
-    "All assets bearish aligned but RSI suggests exhaustion and potential reversal"
+    "recovering_mode active on all 4 assets (BTC 34.45, ETH 32.8, SOL 33.73, XRP 31.58 RSI_4h)",
+    "30m timeframe bullish on BTC/ETH/SOL suggesting short-term bounce in progress",
+    "avg RSI_4h=33.1 deeply oversold, well below 40 threshold \u2014 no trend-following strategies qualify"
   ],
-  "updated_at_dubai": "2026-06-19 18:01:05"
+  "updated_at_dubai": "2026-06-20 00:01:09"
 }
