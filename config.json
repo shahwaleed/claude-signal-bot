@@ -1,15 +1,13 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "rsi_divergence",
+  "secondary_strategy": "ema_basic",
   "confidence": 88,
-  "market_condition": "Recovering mode across all 4 assets with 4h RSI deeply oversold (avg 31.7), all trends bearish-aligned but showing recovery signals",
-  "reasoning": "Rule 5 fires: recovering_mode=True on 4/4 assets (RSI_4h 25-35 range), triggering bollinger mean reversion strategy",
+  "market_condition": "Deeply oversold market with avg RSI_4h at 27.5, all assets bearish-aligned and several near crash territory",
+  "reasoning": "Rule 5 fires: BTC is in recovering_mode, and ETH/SOL/XRP all have RSI_4h below 30 (near crash levels), making bollinger the correct mean-reversion strategy for this oversold, bearish-aligned market.",
   "key_signals": [
-    "4/4 assets in recovering_mode with avg 4h RSI=31.7 (deeply oversold)",
-    "All assets bearish-aligned across 30m/4h/1d \u2014 mean reversion opportunity",
-    "ETH 1d RSI=22.3 near crash territory, BTC 4h RSI=29.6 below lower band threshold",
-    "BB widths elevated (7.7-11.5%) indicating volatility expansion favoring reversion",
-    "No divergence signals present \u2014 bollinger is cleanest fit"
+    "Avg RSI_4h=27.5 \u2014 deeply oversold across all 4 assets",
+    "XRP RSI_4h=25.0, SOL RSI_4h=27.84, ETH RSI_4h=27.21 \u2014 all near crash threshold",
+    "All assets bearish-aligned on 30m+4h+1d with no bullish divergence confirming reversal yet"
   ],
-  "updated_at_dubai": "2026-06-19 06:01:05"
+  "updated_at_dubai": "2026-06-19 12:01:06"
 }
