@@ -1,15 +1,13 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "rsi_divergence",
-  "confidence": 88,
-  "market_condition": "Recovering mode across all 4 assets with depressed 4h RSI averaging 30.5, mixed timeframe trends, no divergence signals",
-  "reasoning": "Rule 5 fires: recovering_mode=True on 4/4 assets (RSI_4h 25-35 range), triggering bollinger mean reversion as the dominant strategy",
+  "secondary_strategy": "ema_basic",
+  "confidence": 72,
+  "market_condition": "Mixed/choppy market with no clear alignment \u2014 30m bullish vs 4h/1d bearish across all assets, avg RSI 40.4 in ranging zone",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, zero bullish-aligned assets); Rule 8 fires \u2014 ranging/choppy market with avg RSI 40.4 within 35-65 band defaults to bollinger",
   "key_signals": [
-    "4/4 assets in recovering_mode with avg 4h RSI=30.5 (oversold territory)",
-    "All assets show 30m bullish but 4h/1d bearish \u2014 classic recovery bounce setup",
-    "SOL 4h RSI=28.63 and XRP 4h RSI=25.0 near crash threshold, reinforcing mean reversion edge",
-    "BB widths elevated (7-11%) indicating recent volatility expansion with room to revert",
-    "No divergence or trend alignment signals to override bollinger default"
+    "All 4 assets show 30m bullish vs 4h+1d bearish \u2014 no timeframe alignment",
+    "Avg 4h RSI = 40.4, sitting in low-ranging zone with no momentum confirmation",
+    "1d RSI extremely oversold on BTC (28.44), ETH (20.36), XRP (29.17) \u2014 potential mean reversion setup for bollinger BUY signals"
   ],
-  "updated_at_dubai": "2026-06-20 06:01:06"
+  "updated_at_dubai": "2026-06-20 12:01:04"
 }
