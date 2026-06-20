@@ -18,8 +18,8 @@ from datetime import datetime, timezone, timedelta
 # blocked by 3Commas (confirmed June 20 2026). Falls back to the direct
 # 3Commas URL if the relay secret isn't set (e.g. local runs).
 WEBHOOK_URL    = os.environ.get("WEBHOOK_RELAY_URL", "https://api.3commas.io/signal_bots/webhooks")
-WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET",
-    "eyJhbGciOiJIUzI1NiJ9.eyJzaWduYWxzX3NvdXJjZV9pZCI6MTMwNTYyfQ.DnbuKVB9cslOFa5l1WtrKH1PFsvacsV0Vfkh_e3E_DY")
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET") or \
+    "eyJhbGciOiJIUzI1NiJ9.eyJzaWduYWxzX3NvdXJjZV9pZCI6MTMwNTYyfQ.DnbuKVB9cslOFa5l1WtrKH1PFsvacsV0Vfkh_e3E_DY"
 
 BOT_UUIDS = {
     "BTCUSDT": "67d3e022-7414-4ef8-8b6c-3d5c56a09667",
