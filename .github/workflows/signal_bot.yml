@@ -81,6 +81,32 @@ jobs:
           if_no_artifact_found: ignore
         continue-on-error: true
 
+      - name: Verify selected strategy file is real (not a stub/missing)
+        run: |
+          STRATEGY="${{ steps.strategy.outputs.strategy }}"
+          case "$STRATEGY" in
+            bollinger)      FILE="strategy_bollinger.py" ;;
+            ema_advanced)   FILE="strategy_ema_advanced.py" ;;
+            vwap)           FILE="strategy_vwap.py" ;;
+            rsi_divergence) FILE="strategy_rsi_divergence.py" ;;
+            breakout)       FILE="strategy_breakout.py" ;;
+            *)              FILE="claude_signal_bot.py" ;;
+          esac
+          # A real strategy file is always well over 1KB; a stub placeholder
+          # (e.g. "# see below") is ~11 bytes. 500 bytes is a safe floor that
+          # would catch any stub while never false-flagging real code.
+          MIN_BYTES=500
+          if [ ! -f "$FILE" ]; then
+            echo "::error::Strategy file '$FILE' for strategy '$STRATEGY' does not exist. Aborting run instead of silently doing nothing."
+            exit 1
+          fi
+          SIZE=$(wc -c < "$FILE")
+          if [ "$SIZE" -lt "$MIN_BYTES" ]; then
+            echo "::error::Strategy file '$FILE' for strategy '$STRATEGY' is only $SIZE bytes — looks like a stub/placeholder, not real strategy code. Aborting run instead of silently doing nothing."
+            exit 1
+          fi
+          echo "Strategy file check passed: $FILE ($SIZE bytes)"
+
       - name: Run selected strategy
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
