@@ -85,6 +85,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+          WEBHOOK_RELAY_URL: ${{ secrets.WEBHOOK_RELAY_URL }}
         run: |
           STRATEGY="${{ steps.strategy.outputs.strategy }}"
           echo "Run STRATEGY=\"$STRATEGY\""

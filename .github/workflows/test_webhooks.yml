@@ -15,4 +15,5 @@ jobs:
       - name: Fire test webhooks to all 4 bots
         env:
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          WEBHOOK_RELAY_URL: ${{ secrets.WEBHOOK_RELAY_URL }}
         run: python test_webhooks.py

@@ -12,7 +12,10 @@ from datetime import datetime, timezone, timedelta
 DUBAI_TZ          = timezone(timedelta(hours=4))
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 COINGECKO_API_KEY = os.environ.get("COINGECKO_API_KEY", "")
-WEBHOOK_URL       = "https://api.3commas.io/signal_bots/webhooks"
+# Routed through a Cloudflare Worker relay because GitHub Actions IPs are
+# blocked by 3Commas (confirmed June 20 2026). Falls back to the direct
+# 3Commas URL if the relay secret isn't set (e.g. local runs).
+WEBHOOK_URL       = os.environ.get("WEBHOOK_RELAY_URL", "https://api.3commas.io/signal_bots/webhooks")
 WEBHOOK_SECRET    = "eyJhbGciOiJIUzI1NiJ9.eyJzaWduYWxzX3NvdXJjZV9pZCI6MTMwNTYyfQ.DnbuKVB9cslOFa5l1WtrKH1PFsvacsV0Vfkh_e3E_DY"
 BOT_UUIDS = {
     "BTCUSDT": "67d3e022-7414-4ef8-8b6c-3d5c56a09667",
