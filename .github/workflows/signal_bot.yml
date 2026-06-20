@@ -1,5 +1,18 @@
 name: Claude Signal Bot
 
+# SCHEDULING NOTE: this workflow has no `on: schedule` trigger — it is fired
+# externally by a cron-job.org job calling the workflow_dispatch API (GitHub's
+# built-in scheduled cron is unreliable and can drop runs under load).
+#
+# That cron-job.org job is intentionally set to run at :05 and :35 past the
+# hour (NOT :00/:30), a deliberate 5-minute offset from the Market Analyzer's
+# schedule (02:00, 06:30, 11:30, 19:00 UTC, i.e. always on a :00/:30 mark).
+# Without this offset, both workflows fire at the exact same instant 4x/day,
+# and depending on which happens to finish first, the signal bot can read a
+# stale config.json before the analyzer has finished writing the new
+# strategy decision. Do not "simplify" this back to :00/:30 — the offset is
+# the fix for that race condition, not an arbitrary scheduling choice.
+
 on:
   workflow_dispatch:
     inputs:
