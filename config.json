@@ -2,14 +2,14 @@
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
   "confidence": 72,
-  "market_condition": "Mixed/choppy market with bearish 4h/1d trends, low RSI across most assets, no clear divergence or alignment",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes on 2+ assets, no bullish alignment); Rule 8 fires as ranging/choppy market with avg RSI 44.3 in 35-65 range, defaulting to bollinger for mean reversion.",
+  "market_condition": "Mixed/choppy market with bearish daily trends, low ATR, avg RSI below 50, no divergence or special modes",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, no bullish-aligned assets); Rule 8 fires as ranging/choppy market with avg RSI 45.8 in 35-65 zone, defaulting to bollinger mean reversion.",
   "key_signals": [
-    "Avg RSI_4h=44.3 \u2014 mid-range, no extreme readings at 4h level",
-    "XRP 30m RSI=1.0 (extreme oversold signal, bollinger BUY override candidate)",
-    "All 4 assets show bearish 4h and 1d trends with no bullish alignment",
-    "ETH 1d RSI=20.36 and BTC 1d RSI=28.44 suggest deeper oversold on daily timeframe",
-    "Avg ATR=1.24% below 1.5% threshold, low volatility environment"
+    "avg RSI_4h=45.8 \u2014 neutral/slightly bearish zone",
+    "No assets bullish-aligned across timeframes (0/4)",
+    "avg ATR 1.26% below 1.5% threshold \u2014 low volatility, mean reversion favored",
+    "XRP fully bearish-aligned with RSI_4h=38.46 near oversold",
+    "BTC and ETH 1d RSI extremely low (28.44 and 20.36) \u2014 watch for recovery signals"
   ],
-  "updated_at_dubai": "2026-06-20 18:01:07"
+  "updated_at_dubai": "2026-06-21 00:01:11"
 }
