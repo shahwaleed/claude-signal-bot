@@ -8,18 +8,21 @@ Log file: trade_log_ema_advanced.csv
 
 Fix: flat market RSI returns 50.0 (neutral) not 100.0
 
-Fix (June 21 2026): the model occasionally returns a "HOLD" signal field
-while its own reasoning text concludes a directional trade (e.g.
-"...Overriding to SELL." but signal="HOLD"). A prompt-only fix (asking
-the model to double-check itself before output) was tried and made
-things worse -- it didn't fix the original contradiction and introduced
-a new JSON-malformation failure on a different symbol in testing. This
-was reverted. The fix is now code-level: detect_signal_contradiction()
-scans the reasoning text for an explicit directional conclusion when the
-signal field is HOLD, and if one is found, the run is logged as
-INVALID/untrustworthy and no webhook fires -- the model's structured
-output is never silently overridden by parsing its prose, but a
-self-contradictory result is also never blindly trusted.
+Fix (June 21 2026, earlier): the model occasionally returns a "HOLD"
+signal field while its own reasoning text concludes a directional trade.
+A prompt-only fix was tried and made things worse (reproduced the same
+contradiction on a different symbol, plus caused a new JSON-malformation
+crash). Reverted. detect_signal_contradiction() now catches this at the
+code level instead: if signal=="HOLD" but the reasoning explicitly states
+a directional conclusion, the result is treated as untrustworthy.
+
+Fix (June 21 2026, later): a separate bug from the above -- ask_claude()
+can also return a JSON response missing the "confidence" field entirely
+(observed in production: KeyError: 'confidence' crashed two symbols in a
+run of strategy_vwap.py). validate_signal_response() now runs first and
+guarantees a safe, complete dict before detect_signal_contradiction() (or
+anything else) ever touches signal/confidence -- a malformed response is
+caught here rather than crashing the run.
 """
 
 import requests
@@ -148,6 +151,33 @@ def parse_claude_json(raw):
     m=re.search(r'\{[^{}]*\}',raw,re.DOTALL)
     if m: return json.loads(m.group())
     return json.loads(raw)
+
+
+def validate_signal_response(raw_signal):
+    """
+    Guarantees a safe, complete dict is returned: {"signal", "confidence",
+    "reasoning"}. If raw_signal is missing required fields, has the wrong
+    types, or "signal" isn't BUY/SELL/HOLD, returns a safe HOLD/0 result
+    instead of letting a KeyError (or similar) crash the run. The
+    "reasoning" field explains what was wrong, so it's visible in logs/CSV.
+
+    Always runs before detect_signal_contradiction(): that function
+    assumes signal/confidence/reasoning are present and well-typed, so
+    this guarantees those preconditions hold first.
+    """
+    if not isinstance(raw_signal, dict):
+        return {"signal": "HOLD", "confidence": 0,
+                "reasoning": f"[INVALID: response was not a dict, got {type(raw_signal).__name__}]"}
+    signal = raw_signal.get("signal")
+    confidence = raw_signal.get("confidence")
+    reasoning = raw_signal.get("reasoning", "")
+    if signal not in ("BUY", "SELL", "HOLD"):
+        return {"signal": "HOLD", "confidence": 0,
+                "reasoning": f"[INVALID: signal field missing or not BUY/SELL/HOLD, got {signal!r}] {reasoning}"}
+    if not isinstance(confidence, (int, float)):
+        return {"signal": "HOLD", "confidence": 0,
+                "reasoning": f"[INVALID: confidence field missing or not numeric, got {confidence!r}] {reasoning}"}
+    return {"signal": signal, "confidence": confidence, "reasoning": reasoning}
 
 
 def detect_signal_contradiction(signal_field, reasoning_text):
@@ -283,21 +313,26 @@ def run():
             print(f"  30m: EMA9={ind['ema9_30m']} EMA21={ind['ema21_30m']} RSI7={ind['rsi7_30m']}")
             print(f"  4h:  Trend={ind['trend_4h']} RSI7={ind['rsi7_4h']}")
             print(f"  Div: {ind['divergence'] or 'none'} | [SAR] pos={open_positions.get(symbol,'None')}")
-            signal=ask_claude(symbol,ind)
+            raw_signal=ask_claude(symbol,ind)
+            signal=validate_signal_response(raw_signal)
 
-            contradicted = detect_signal_contradiction(signal["signal"], signal.get("reasoning",""))
-            if contradicted:
-                print(f"  ⚠️  INVALID: model signal=HOLD but reasoning states a directional conclusion.")
-                print(f"  Reasoning: {signal.get('reasoning','')}")
-                print(f"  Treating as untrustworthy — forcing HOLD, no webhook will fire.")
-                signal["reasoning"] = "[INVALID: signal/reasoning contradiction detected, forced HOLD] " + signal.get("reasoning","")
+            if signal["confidence"]==0 and signal["reasoning"].startswith("[INVALID"):
+                print(f"  ⚠️  {signal['reasoning']}")
+                contradicted = False  # already invalid; no need to also check contradiction
             else:
-                print(f"  Signal:{signal['signal']} Conf:{signal['confidence']}% | {signal.get('reasoning','')}")
+                contradicted = detect_signal_contradiction(signal["signal"], signal.get("reasoning",""))
+                if contradicted:
+                    print(f"  ⚠️  INVALID: model signal=HOLD but reasoning states a directional conclusion.")
+                    print(f"  Reasoning: {signal.get('reasoning','')}")
+                    print(f"  Treating as untrustworthy — forcing HOLD, no webhook will fire.")
+                    signal["reasoning"] = "[INVALID: signal/reasoning contradiction detected, forced HOLD] " + signal.get("reasoning","")
+                else:
+                    print(f"  Signal:{signal['signal']} Conf:{signal['confidence']}% | {signal.get('reasoning','')}")
 
             fired=False
             if not contradicted and signal["signal"] in ("BUY","SELL") and signal["confidence"]>=MIN_CONFIDENCE:
                 fired=fire_webhook(signal["signal"],price,symbol)
-            elif not contradicted:
+            elif not contradicted and signal["signal"]=="HOLD":
                 print("  HOLD — no webhook fired.")
 
             log_result(symbol,signal,ind,price,fired)
