@@ -1,13 +1,15 @@
 {
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
-  "confidence": 72,
-  "market_condition": "Mixed bearish alignment with high avg RSI driven by SOL overbought; no divergence, no crash/recovering modes, choppy low-ATR environment",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/recovering/overbought on 2+ assets, no bullish aligned assets); Rule 8 fires as market is ranging/choppy with avg RSI 35-65 range approximated and low ATR 0.99%, defaulting to bollinger mean reversion",
+  "confidence": 78,
+  "market_condition": "Mixed bearish alignment with elevated RSI levels and low volatility; SOL overbought but only 1 asset triggers overbought_mode",
+  "reasoning": "No divergence signals, no crash/recovering modes meeting threshold, no bullish-aligned assets for trend following \u2014 falls to Rule 8 (ranging/choppy market with avg RSI near 65 range) defaulting to bollinger as the universal fallback handler.",
   "key_signals": [
-    "SOL overbought (RSI_4h=78.62) \u2014 single asset, not enough for rule 4",
-    "BTC/ETH/XRP all bearish aligned but RSI mixed (BTC 4h=70.28, ETH 4h=62.42, XRP 4h=50.0)",
-    "Low avg ATR 0.99% confirms low volatility, choppy conditions favoring mean reversion"
+    "SOL RSI_4h=87.95 overbought but only 1/4 assets trigger overbought_mode rule",
+    "BTC and XRP fully bearish aligned with moderate 4h RSI (74.54, 66.67)",
+    "Avg ATR=0.97% below 1.5% threshold, low volatility environment",
+    "ETH 1d RSI=20.36 extremely oversold on daily but no crash_mode triggered",
+    "No bullish divergence or trend alignment across 3+ assets to trigger vwap/ema_advanced"
   ],
-  "updated_at_dubai": "2026-06-21 18:01:06"
+  "updated_at_dubai": "2026-06-22 00:01:07"
 }
