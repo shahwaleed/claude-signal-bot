@@ -7,11 +7,19 @@ Strategy: Advanced EMA Crossover
 Log file: trade_log_ema_advanced.csv
 
 Fix: flat market RSI returns 50.0 (neutral) not 100.0
-Fix: system prompt now explicitly handles the 30m/4h "agree" case in Step 1
-     (previously only the disagree case was spelled out, which left agree
-     cases ambiguous and let the model's reasoning drift from its own
-     final JSON output) and requires the final signal/confidence fields to
-     match the stated reasoning conclusion.
+
+Fix (June 21 2026): the model occasionally returns a "HOLD" signal field
+while its own reasoning text concludes a directional trade (e.g.
+"...Overriding to SELL." but signal="HOLD"). A prompt-only fix (asking
+the model to double-check itself before output) was tried and made
+things worse -- it didn't fix the original contradiction and introduced
+a new JSON-malformation failure on a different symbol in testing. This
+was reverted. The fix is now code-level: detect_signal_contradiction()
+scans the reasoning text for an explicit directional conclusion when the
+signal field is HOLD, and if one is found, the run is logged as
+INVALID/untrustworthy and no webhook fires -- the model's structured
+output is never silently overridden by parsing its prose, but a
+self-contradictory result is also never blindly trusted.
 """
 
 import requests
@@ -142,22 +150,45 @@ def parse_claude_json(raw):
     return json.loads(raw)
 
 
+def detect_signal_contradiction(signal_field, reasoning_text):
+    """
+    Returns True if reasoning_text appears to state an explicit
+    directional conclusion (BUY/SELL) while signal_field == "HOLD".
+
+    Only ever meaningful when signal_field == "HOLD": a BUY or SELL field
+    can't contradict itself under this check, so those are always False.
+
+    Patterns are deliberately narrow (only late-stated CONCLUSIONS, e.g.
+    "Overriding to SELL", "Signal is SELL") rather than any mention of
+    "buy"/"sell" anywhere in the text -- broader matching was tested and
+    produced false positives on legitimate HOLD reasoning like "not
+    enough to justify a buy or sell signal" or "a sell signal would
+    require RSI above 75". Validated against both real failures seen in
+    production (XRP and ETH, June 21 2026) plus 8 legitimate non-matching
+    HOLD reasoning variants -- see test suite used during development.
+    """
+    if signal_field != "HOLD":
+        return False
+    text = reasoning_text.lower()
+    conclusion_patterns = [
+        r'overriding to (buy|sell)',
+        r'\bsignal is (buy|sell)\b',
+        r'final (signal|output)[^.]{0,40}\b(buy|sell)\b',
+    ]
+    return any(re.search(pat, text) for pat in conclusion_patterns)
+
+
 SYSTEM_PROMPT = """You are a professional crypto trading signal engine. Output ONLY a raw JSON object.
 No text, no markdown, no backticks. One JSON object only.
 
 STRATEGY: Advanced EMA + Multi-Timeframe + RSI Divergence
 
-30m direction is bullish if EMA9_30m > EMA21_30m, else bearish.
-(4h direction is given to you directly as "Trend".)
-
 STEP 1 — MANDATORY HOLD CHECK:
-If 30m direction and 4h Trend DISAGREE (one bullish, one bearish) → HOLD immediately, confidence 50.
-If 30m direction and 4h Trend AGREE, proceed to STEP 2.
+If 30m EMA direction and 4h trend DISAGREE → HOLD immediately, confidence 50.
 
 STEP 2 — OVERRIDE:
 - RSI7_30m < 25 → BUY, confidence 95
 - RSI7_30m > 75 → SELL, confidence 95
-(Overrides apply regardless of Step 1's outcome.)
 
 STEP 3 — SIGNAL + CONFIDENCE (start 50):
 BUY: EMA9_30m > EMA21_30m AND 4h bullish
@@ -165,14 +196,6 @@ SELL: EMA9_30m < EMA21_30m AND 4h bearish
 +15 30m EMA, +20 4h trend, +10 RSI zone,
 +15 divergence confirms, -10 divergence opposes, -20 RSI strongly opposes.
 Cap at 100.
-
-FINAL CHECK (mandatory before you output): re-read your own reasoning.
-The "signal" and "confidence" fields you output MUST exactly match the
-conclusion your reasoning arrives at. If your reasoning text concludes
-BUY or SELL, the "signal" field must be that same BUY or SELL — never
-output HOLD while your reasoning argues for a directional trade, and
-never state one confidence value in your reasoning and a different one
-in the "confidence" field.
 
 Output: {"signal":"BUY","confidence":85,"reasoning":"30m bullish EMA confirmed by 4h uptrend"}"""
 
@@ -261,12 +284,22 @@ def run():
             print(f"  4h:  Trend={ind['trend_4h']} RSI7={ind['rsi7_4h']}")
             print(f"  Div: {ind['divergence'] or 'none'} | [SAR] pos={open_positions.get(symbol,'None')}")
             signal=ask_claude(symbol,ind)
-            print(f"  Signal:{signal['signal']} Conf:{signal['confidence']}% | {signal.get('reasoning','')}")
-            fired=False
-            if signal["signal"] in ("BUY","SELL") and signal["confidence"]>=MIN_CONFIDENCE:
-                fired=fire_webhook(signal["signal"],price,symbol)
+
+            contradicted = detect_signal_contradiction(signal["signal"], signal.get("reasoning",""))
+            if contradicted:
+                print(f"  ⚠️  INVALID: model signal=HOLD but reasoning states a directional conclusion.")
+                print(f"  Reasoning: {signal.get('reasoning','')}")
+                print(f"  Treating as untrustworthy — forcing HOLD, no webhook will fire.")
+                signal["reasoning"] = "[INVALID: signal/reasoning contradiction detected, forced HOLD] " + signal.get("reasoning","")
             else:
+                print(f"  Signal:{signal['signal']} Conf:{signal['confidence']}% | {signal.get('reasoning','')}")
+
+            fired=False
+            if not contradicted and signal["signal"] in ("BUY","SELL") and signal["confidence"]>=MIN_CONFIDENCE:
+                fired=fire_webhook(signal["signal"],price,symbol)
+            elif not contradicted:
                 print("  HOLD — no webhook fired.")
+
             log_result(symbol,signal,ind,price,fired)
             time.sleep(3)
         except Exception as e:
