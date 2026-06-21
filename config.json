@@ -1,15 +1,13 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "rsi_divergence",
-  "confidence": 82,
-  "market_condition": "Mixed signals with high avg RSI near overbought territory, no trend alignment, choppy price action across assets",
-  "reasoning": "Rule 4 partially fires (BTC overbought_mode=True, SOL RSI_4h=77.71 borderline), and with avg RSI_4h=70.0 at overbought threshold plus no bullish alignment across assets, bollinger is the correct default for this ranging/overbought mixed market.",
+  "secondary_strategy": "ema_basic",
+  "confidence": 72,
+  "market_condition": "Mixed/choppy market with conflicting timeframes, high 4h RSI average near overbought, and low ATR indicating reduced volatility",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes on 2+ assets, no bullish-aligned assets); Rule 8 fires as market is ranging/choppy with avg RSI_4h at 67.0 within 35-65 borderline zone and no directional alignment across assets",
   "key_signals": [
-    "BTC overbought_mode=True with RSI_4h=75.91",
-    "SOL RSI_4h=77.71 with bearish divergence signaling potential reversal",
-    "Avg RSI_4h=70.0 at overbought boundary with no assets fully bullish-aligned",
-    "XRP 30m RSI=100 indicating extreme short-term overbought condition",
-    "All 4 assets show 1d=bearish trend despite short-term bullish 30m momentum"
+    "SOL overbought_mode=True on 4h RSI 76.88 but only 1/4 assets \u2014 insufficient for Rule 4",
+    "BTC showing divergent signals: 4h RSI 72.32 (near overbought) vs 1d RSI 28.44 (oversold) \u2014 conflict",
+    "avg ATR 1.01% well below 1.5% threshold and 0/4 assets bullish-aligned, eliminating vwap and ema_advanced"
   ],
-  "updated_at_dubai": "2026-06-21 06:01:04"
+  "updated_at_dubai": "2026-06-21 12:01:05"
 }
