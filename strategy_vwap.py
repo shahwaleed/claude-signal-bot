@@ -4,6 +4,13 @@ Best for: Trending markets with institutional participation
 Log file: trade_log_vwap.csv
 
 Fix: flat market RSI returns 50.0 (neutral) not 100.0
+
+Fix (June 21 2026): ask_claude() can return a JSON response missing the
+"confidence" field (observed in production: KeyError: 'confidence' crashed
+the run for ETHUSDT and XRPUSDT). validate_signal_response() now checks
+the parsed response has valid signal/confidence fields before anything
+else touches them; if not, it returns a safe HOLD/0 result instead of
+crashing, so one malformed response no longer aborts the whole run.
 """
 
 import requests
@@ -119,6 +126,29 @@ def parse_claude_json(raw):
     return json.loads(raw)
 
 
+def validate_signal_response(raw_signal):
+    """
+    Guarantees a safe, complete dict is returned: {"signal", "confidence",
+    "reasoning"}. If raw_signal is missing required fields, has the wrong
+    types, or "signal" isn't BUY/SELL/HOLD, returns a safe HOLD/0 result
+    instead of letting a KeyError (or similar) crash the run. The
+    "reasoning" field explains what was wrong, so it's visible in logs/CSV.
+    """
+    if not isinstance(raw_signal, dict):
+        return {"signal": "HOLD", "confidence": 0,
+                "reasoning": f"[INVALID: response was not a dict, got {type(raw_signal).__name__}]"}
+    signal = raw_signal.get("signal")
+    confidence = raw_signal.get("confidence")
+    reasoning = raw_signal.get("reasoning", "")
+    if signal not in ("BUY", "SELL", "HOLD"):
+        return {"signal": "HOLD", "confidence": 0,
+                "reasoning": f"[INVALID: signal field missing or not BUY/SELL/HOLD, got {signal!r}] {reasoning}"}
+    if not isinstance(confidence, (int, float)):
+        return {"signal": "HOLD", "confidence": 0,
+                "reasoning": f"[INVALID: confidence field missing or not numeric, got {confidence!r}] {reasoning}"}
+    return {"signal": signal, "confidence": confidence, "reasoning": reasoning}
+
+
 SYSTEM_PROMPT = """You are a crypto trading signal engine using VWAP + EMA strategy.
 Output ONLY a raw JSON object. No text, no markdown.
 
@@ -215,8 +245,12 @@ def run():
             ind=get_indicators(candles)
             print(f"  Price:${ind['price']:,.4f} VWAP:{ind['vwap']} vsVWAP:{ind['price_vs_vwap']}% EMAspread:{ind['ema_spread']}% RSI:{ind['rsi14']}")
             print(f"  [SAR] pos={open_positions.get(symbol,'None')}")
-            signal=ask_claude(symbol,ind)
-            print(f"  Signal:{signal['signal']} Conf:{signal['confidence']}% | {signal.get('reasoning','')}")
+            raw_signal=ask_claude(symbol,ind)
+            signal=validate_signal_response(raw_signal)
+            if signal["confidence"]==0 and signal["reasoning"].startswith("[INVALID"):
+                print(f"  ⚠️  {signal['reasoning']}")
+            else:
+                print(f"  Signal:{signal['signal']} Conf:{signal['confidence']}% | {signal.get('reasoning','')}")
             fired=False
             if signal["signal"] in ("BUY","SELL") and signal["confidence"]>=MIN_CONFIDENCE:
                 fired=fire_webhook(signal["signal"],ind["price"],symbol)
