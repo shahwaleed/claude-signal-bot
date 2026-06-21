@@ -7,6 +7,11 @@ Strategy: Advanced EMA Crossover
 Log file: trade_log_ema_advanced.csv
 
 Fix: flat market RSI returns 50.0 (neutral) not 100.0
+Fix: system prompt now explicitly handles the 30m/4h "agree" case in Step 1
+     (previously only the disagree case was spelled out, which left agree
+     cases ambiguous and let the model's reasoning drift from its own
+     final JSON output) and requires the final signal/confidence fields to
+     match the stated reasoning conclusion.
 """
 
 import requests
@@ -142,12 +147,17 @@ No text, no markdown, no backticks. One JSON object only.
 
 STRATEGY: Advanced EMA + Multi-Timeframe + RSI Divergence
 
+30m direction is bullish if EMA9_30m > EMA21_30m, else bearish.
+(4h direction is given to you directly as "Trend".)
+
 STEP 1 — MANDATORY HOLD CHECK:
-If 30m EMA direction and 4h trend DISAGREE → HOLD immediately, confidence 50.
+If 30m direction and 4h Trend DISAGREE (one bullish, one bearish) → HOLD immediately, confidence 50.
+If 30m direction and 4h Trend AGREE, proceed to STEP 2.
 
 STEP 2 — OVERRIDE:
 - RSI7_30m < 25 → BUY, confidence 95
 - RSI7_30m > 75 → SELL, confidence 95
+(Overrides apply regardless of Step 1's outcome.)
 
 STEP 3 — SIGNAL + CONFIDENCE (start 50):
 BUY: EMA9_30m > EMA21_30m AND 4h bullish
@@ -155,6 +165,14 @@ SELL: EMA9_30m < EMA21_30m AND 4h bearish
 +15 30m EMA, +20 4h trend, +10 RSI zone,
 +15 divergence confirms, -10 divergence opposes, -20 RSI strongly opposes.
 Cap at 100.
+
+FINAL CHECK (mandatory before you output): re-read your own reasoning.
+The "signal" and "confidence" fields you output MUST exactly match the
+conclusion your reasoning arrives at. If your reasoning text concludes
+BUY or SELL, the "signal" field must be that same BUY or SELL — never
+output HOLD while your reasoning argues for a directional trade, and
+never state one confidence value in your reasoning and a different one
+in the "confidence" field.
 
 Output: {"signal":"BUY","confidence":85,"reasoning":"30m bullish EMA confirmed by 4h uptrend"}"""
 
