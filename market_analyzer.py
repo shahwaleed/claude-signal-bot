@@ -19,6 +19,11 @@ Rule changes from previous version (all derived from backtest evidence):
      (bullish div only valid when avg RSI < 50; bearish div when avg RSI > 50)
   3. Rule 7: lowered from 4/4 to 3/4 aligned, RSI cap widened 65→70
   4. Rule 8: bollinger RSI band widened 40-60 → 35-65
+
+Fix (June 22 2026): write_analyzer_summary() writes a structured JSON summary
+to analyzer_summary.json at the end of each run. The workflow then commits it
+to run_summaries/YYYY-MM-DD_HH-MM_analyzer.json in the repo so Claude can
+read analyzer decisions via GitHub MCP without needing browser access.
 """
 
 import requests
@@ -40,6 +45,7 @@ CONFIG_PATH       = "config.json"
 COINGECKO_IDS = {"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana", "XRP": "ripple"}
 STRATEGIES    = ["bollinger", "ema_advanced", "vwap", "rsi_divergence", "ema_basic"]
 MIN_SYMBOLS   = 3
+SUMMARY_FILE  = "analyzer_summary.json"
 
 
 # ─────────────────────────────────────────
@@ -368,6 +374,47 @@ def log_decision(rec):
 
 
 # ─────────────────────────────────────────
+# SUMMARY
+# ─────────────────────────────────────────
+
+def write_analyzer_summary(rec, market_data, error=None):
+    """
+    Writes analyzer_summary.json to disk. The workflow then commits this
+    to run_summaries/YYYY-MM-DD_HH-MM_analyzer.json in the repo so Claude
+    can read analyzer decisions via GitHub MCP autonomously.
+    """
+    now = datetime.now(tz=DUBAI_TZ)
+    summary = {
+        "run_at_dubai":        now.strftime("%Y-%m-%d %H:%M:%S"),
+        "strategy_chosen":     rec.get("recommended_strategy", "") if rec else "",
+        "secondary_strategy":  rec.get("secondary_strategy", "") if rec else "",
+        "confidence":          rec.get("confidence", 0) if rec else 0,
+        "market_condition":    rec.get("market_condition", "") if rec else "",
+        "reasoning":           rec.get("reasoning", "") if rec else "",
+        "key_signals":         rec.get("key_signals", []) if rec else [],
+        "error":               error,
+        "assets": {
+            sym: {
+                "rsi_4h":          d["rsi_4h"],
+                "rsi_30m":         d["rsi_30m"],
+                "trend_4h":        d["trend_4h"],
+                "trend_1d":        d["trend_1d"],
+                "aligned":         d["aligned"],
+                "divergence":      d["divergence"],
+                "crash_mode":      d["crash_mode"],
+                "overbought_mode": d["overbought_mode"],
+                "recovering_mode": d["recovering_mode"],
+                "atr_pct_4h":      d["atr_pct_4h"],
+            }
+            for sym, d in market_data.items()
+        } if market_data else {},
+    }
+    with open(SUMMARY_FILE, "w") as f:
+        json.dump(summary, f, indent=2)
+    print(f"\n  Analyzer summary written to {SUMMARY_FILE}")
+
+
+# ─────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────
 
@@ -381,6 +428,7 @@ def run():
     data = analyze_market()
     if not data:
         print(f"ERROR: insufficient data — aborting")
+        write_analyzer_summary(None, {}, error="insufficient market data")
         return
 
     print("\n  Mode summary:")
@@ -405,6 +453,7 @@ def run():
         print(f"  ERROR writing config: {e}")
 
     log_decision(rec)
+    write_analyzer_summary(rec, data)
 
     print(f"\n{'='*60}")
     print("Analysis complete. Signal bot will use new strategy on next run.")
