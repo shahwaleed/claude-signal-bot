@@ -2,12 +2,12 @@
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
   "confidence": 72,
-  "market_condition": "Mixed/ranging market with no dominant trend alignment, avg RSI near mid-range, low ATR",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, no bullish-aligned assets); Rule 8 fires as ranging/choppy market with avg RSI 52.1 in 35-65 zone, defaulting to bollinger.",
+  "market_condition": "Mixed/choppy market with no clear alignment, avg RSI 62.5, no divergence or extreme modes",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering, no bullish-aligned assets); Rule 8 fires for ranging/choppy market with avg RSI 35-65 \u2192 bollinger",
   "key_signals": [
-    "No assets bullish-aligned across timeframes \u2014 0/4 qualify",
-    "Avg RSI_4h=52.1 sits in mid-range 35-65, confirming ranging/choppy conditions",
-    "Avg ATR=1.02% is low, ruling out momentum strategies like vwap"
+    "0/4 assets bullish-aligned across timeframes \u2014 market is fragmented",
+    "Avg RSI_4h=62.5 sits in mid-range, no extremes triggering overrides",
+    "1d RSI deeply oversold on BTC(28.44) and ETH(20.36) while 4h RSI elevated \u2014 conflicting timeframes confirm chop"
   ],
-  "updated_at_dubai": "2026-06-22 06:01:08"
+  "updated_at_dubai": "2026-06-22 12:01:07"
 }
