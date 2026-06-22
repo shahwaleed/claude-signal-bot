@@ -1,0 +1,33 @@
+{
+  "run_at_dubai": "2026-06-22 10:09:17",
+  "strategy": "breakout",
+  "symbols": {
+    "BTCUSDT": {
+      "signal": "HOLD",
+      "confidence": 45,
+      "fired": false,
+      "invalid": false
+    },
+    "ETHUSDT": {
+      "signal": "HOLD",
+      "confidence": 50,
+      "fired": false,
+      "invalid": false
+    },
+    "SOLUSDT": {
+      "signal": "HOLD",
+      "confidence": 40,
+      "fired": false,
+      "invalid": false
+    },
+    "XRPUSDT": {
+      "signal": "HOLD",
+      "confidence": 45,
+      "fired": false,
+      "invalid": false
+    }
+  },
+  "signals_fired": 0,
+  "errors": [],
+  "invalids": []
+}
