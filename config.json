@@ -1,13 +1,15 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "rsi_divergence",
+  "secondary_strategy": "ema_basic",
   "confidence": 72,
-  "market_condition": "Mixed trends with bearish divergence on 2/4 assets, no dominant mode, ranging/choppy across timeframes",
-  "reasoning": "Rules 1-7 all fail (bearish divergence only on 2/4 assets, no crash/overbought/recovering modes, 0 assets fully bullish-aligned); Rule 8 fires as ranging/choppy market with avg RSI 40-70 range and conflicting timeframe trends default to bollinger",
+  "market_condition": "Mixed/choppy market with no dominant regime \u2014 30m bearish across all assets, conflicting timeframes, avg RSI 55.9 in mid-range",
+  "reasoning": "Rules 1-7 all fail (insufficient divergence, no crash/overbought/recovering modes, zero bullish-aligned assets); Rule 8 fires as ranging/choppy market with avg RSI 35-65.",
   "key_signals": [
-    "Bearish divergence on BTC and ETH (2/4, insufficient for rsi_divergence trigger)",
-    "All 4 assets show 30m bullish but 1d bearish \u2014 strong timeframe conflict, no alignment",
-    "Avg RSI_4h=64.9 near upper neutral zone, avg ATR=1.18% below 1.5% threshold"
+    "All 4 assets show 30m bearish with conflicting 4h/1d signals \u2014 no alignment",
+    "Avg RSI_4h=55.9 sits in mid-range (35-65), confirming ranging/choppy conditions",
+    "Only 1/4 assets shows bearish divergence (BTC) \u2014 insufficient for rsi_divergence trigger",
+    "ETH 1d RSI=20.36 and BTC 1d RSI=28.44 signal daily oversold pressure \u2014 watch for mean reversion",
+    "Avg ATR=1.22% below 1.5% threshold, low volatility reinforces mean-reversion over trend-following"
   ],
-  "updated_at_dubai": "2026-06-22 18:07:39"
+  "updated_at_dubai": "2026-06-23 00:01:18"
 }
