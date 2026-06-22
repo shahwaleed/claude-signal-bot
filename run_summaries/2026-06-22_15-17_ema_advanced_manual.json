@@ -1,0 +1,38 @@
+{
+  "run_at_dubai": "2026-06-22 19:17:56",
+  "strategy": "ema_advanced",
+  "symbols": {
+    "BTCUSDT": {
+      "signal": "BUY",
+      "confidence": 95,
+      "fired": true,
+      "invalid": false,
+      "contradicted": false
+    },
+    "ETHUSDT": {
+      "signal": "BUY",
+      "confidence": 95,
+      "fired": true,
+      "invalid": false,
+      "contradicted": false
+    },
+    "SOLUSDT": {
+      "signal": "BUY",
+      "confidence": 95,
+      "fired": true,
+      "invalid": false,
+      "contradicted": false
+    },
+    "XRPUSDT": {
+      "signal": "HOLD",
+      "confidence": 50,
+      "fired": false,
+      "invalid": false,
+      "contradicted": false
+    }
+  },
+  "signals_fired": 3,
+  "errors": [],
+  "invalids": [],
+  "contradictions": []
+}
