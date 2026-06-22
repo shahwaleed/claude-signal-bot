@@ -11,6 +11,11 @@ the run for ETHUSDT and XRPUSDT). validate_signal_response() now checks
 the parsed response has valid signal/confidence fields before anything
 else touches them; if not, it returns a safe HOLD/0 result instead of
 crashing, so one malformed response no longer aborts the whole run.
+
+Fix (June 22 2026): write_run_summary() writes a structured JSON summary
+to run_summary.json at the end of each run. The workflow then commits it
+to run_summaries/YYYY-MM-DD_HH-MM_strategy[_manual].json in the repo so
+Claude can read run history via GitHub MCP without needing browser access.
 """
 
 import requests
@@ -42,6 +47,7 @@ TAKE_PROFIT    = 2.0
 STOP_LOSS      = 3.0
 MIN_CONFIDENCE = 65
 LOG_FILE       = "trade_log_vwap.csv"
+SUMMARY_FILE   = "run_summary.json"
 
 open_positions = {s: None for s in ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT"]}
 
@@ -234,10 +240,32 @@ def log_result(symbol, signal, ind, fired):
     print(f"  [{ts}] {symbol} | {signal['signal']} | {signal['confidence']}% | vsVWAP:{ind['price_vs_vwap']}% | Fired:{fired}")
 
 
+def write_run_summary(summary):
+    """
+    Writes run_summary.json to disk. The workflow then commits this file
+    to run_summaries/YYYY-MM-DD_HH-MM_strategy[_manual].json in the repo
+    so Claude can read full run history via GitHub MCP.
+    """
+    with open(SUMMARY_FILE, "w") as f:
+        json.dump(summary, f, indent=2)
+    print(f"\n  Run summary written to {SUMMARY_FILE}")
+
+
 def run():
-    now=datetime.now(tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M")
-    print(f"\n{'='*56}\nVWAP + EMA Strategy — {now} Dubai time\n{'='*56}")
+    now = datetime.now(tz=DUBAI_TZ)
+    now_str = now.strftime("%Y-%m-%d %H:%M")
+    print(f"\n{'='*56}\nVWAP + EMA Strategy — {now_str} Dubai time\n{'='*56}")
     load_positions_from_log()
+
+    summary = {
+        "run_at_dubai": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "strategy": "vwap",
+        "symbols": {},
+        "signals_fired": 0,
+        "errors": [],
+        "invalids": [],
+    }
+
     for symbol in SYMBOLS:
         print(f"\n--- {symbol} ---")
         try:
@@ -247,19 +275,38 @@ def run():
             print(f"  [SAR] pos={open_positions.get(symbol,'None')}")
             raw_signal=ask_claude(symbol,ind)
             signal=validate_signal_response(raw_signal)
-            if signal["confidence"]==0 and signal["reasoning"].startswith("[INVALID"):
+            is_invalid = signal["confidence"]==0 and signal["reasoning"].startswith("[INVALID")
+            if is_invalid:
                 print(f"  ⚠️  {signal['reasoning']}")
+                summary["invalids"].append(symbol)
             else:
                 print(f"  Signal:{signal['signal']} Conf:{signal['confidence']}% | {signal.get('reasoning','')}")
             fired=False
-            if signal["signal"] in ("BUY","SELL") and signal["confidence"]>=MIN_CONFIDENCE:
+            if not is_invalid and signal["signal"] in ("BUY","SELL") and signal["confidence"]>=MIN_CONFIDENCE:
                 fired=fire_webhook(signal["signal"],ind["price"],symbol)
+                if fired:
+                    summary["signals_fired"] += 1
             else:
                 print("  HOLD — no webhook fired.")
             log_result(symbol,signal,ind,fired)
+            summary["symbols"][symbol] = {
+                "signal": signal["signal"],
+                "confidence": signal["confidence"],
+                "fired": fired,
+                "invalid": is_invalid,
+            }
             time.sleep(3)
         except Exception as e:
             print(f"  ERROR: {e}")
+            summary["errors"].append({"symbol": symbol, "error": str(e)})
+            summary["symbols"][symbol] = {
+                "signal": "ERROR",
+                "confidence": 0,
+                "fired": False,
+                "invalid": False,
+            }
+
+    write_run_summary(summary)
     print(f"\n{'='*56}\nRun complete.\n{'='*56}\n")
 
 
