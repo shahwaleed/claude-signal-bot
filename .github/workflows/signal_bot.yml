@@ -40,7 +40,7 @@ env:
 
 permissions:
   actions: read
-  contents: read
+  contents: write  # required to commit run_summary.json to run_summaries/
 
 jobs:
   run-bot:
@@ -63,13 +63,16 @@ jobs:
           MANUAL="${{ github.event.inputs.strategy }}"
           if [ -n "$MANUAL" ]; then
             echo "strategy=$MANUAL" >> $GITHUB_OUTPUT
+            echo "source=manual" >> $GITHUB_OUTPUT
             echo "Source: manual override — $MANUAL"
           elif [ -f config.json ]; then
             AUTO=$(python3 -c "import json; print(json.load(open('config.json'))['strategy'])")
             echo "strategy=$AUTO" >> $GITHUB_OUTPUT
+            echo "source=auto" >> $GITHUB_OUTPUT
             echo "Source: config.json — $AUTO"
           else
             echo "strategy=bollinger" >> $GITHUB_OUTPUT
+            echo "source=auto" >> $GITHUB_OUTPUT
             echo "Source: default — bollinger"
           fi
 
@@ -81,9 +84,18 @@ jobs:
           ARTIFACT="trade-log-${STRATEGY//_/-}"
           # Log file name uses underscores (Python filename)
           LOGFILE="trade_log_${STRATEGY}.csv"
+          # Summary filename: timestamped, includes strategy and manual/auto source
+          TIMESTAMP=$(date -u +"%Y-%m-%d_%H-%M")
+          SOURCE="${{ steps.strategy.outputs.source }}"
+          if [ "$SOURCE" = "manual" ]; then
+            SUMMARY_DEST="run_summaries/${TIMESTAMP}_${STRATEGY}_manual.json"
+          else
+            SUMMARY_DEST="run_summaries/${TIMESTAMP}_${STRATEGY}.json"
+          fi
           echo "artifact=$ARTIFACT" >> $GITHUB_OUTPUT
           echo "logfile=$LOGFILE" >> $GITHUB_OUTPUT
-          echo "Strategy: $STRATEGY | Artifact: $ARTIFACT | Log: $LOGFILE"
+          echo "summary_dest=$SUMMARY_DEST" >> $GITHUB_OUTPUT
+          echo "Strategy: $STRATEGY | Artifact: $ARTIFACT | Log: $LOGFILE | Summary: $SUMMARY_DEST"
 
       - name: Download previous trade log for this strategy
         uses: dawidd6/action-download-artifact@v6
@@ -141,6 +153,25 @@ jobs:
           else
             python claude_signal_bot.py
           fi
+
+      - name: Commit run summary to repo
+        if: always()
+        run: |
+          SUMMARY_DEST="${{ steps.names.outputs.summary_dest }}"
+          if [ ! -f run_summary.json ]; then
+            echo "run_summary.json not found — strategy may not support summaries yet, skipping."
+            exit 0
+          fi
+          mkdir -p run_summaries
+          cp run_summary.json "$SUMMARY_DEST"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$SUMMARY_DEST"
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "Run summary: ${{ steps.strategy.outputs.strategy }} — $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload updated trade log
         uses: actions/upload-artifact@v4
