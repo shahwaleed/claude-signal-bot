@@ -1,0 +1,53 @@
+{
+  "run_at_dubai": "2026-06-23 01:11:49",
+  "strategy": "ema_advanced",
+  "positions_loaded": {
+    "BTCUSDT": null,
+    "ETHUSDT": null,
+    "SOLUSDT": null,
+    "XRPUSDT": null
+  },
+  "symbols": {
+    "BTCUSDT": {
+      "signal": "HOLD",
+      "confidence": 50,
+      "prior_position": null,
+      "fired": false,
+      "sar_reversed": false,
+      "invalid": false,
+      "contradicted": false
+    },
+    "ETHUSDT": {
+      "signal": "HOLD",
+      "confidence": 50,
+      "prior_position": null,
+      "fired": false,
+      "sar_reversed": false,
+      "invalid": false,
+      "contradicted": false
+    },
+    "SOLUSDT": {
+      "signal": "HOLD",
+      "confidence": 50,
+      "prior_position": null,
+      "fired": false,
+      "sar_reversed": false,
+      "invalid": false,
+      "contradicted": false
+    },
+    "XRPUSDT": {
+      "signal": "HOLD",
+      "confidence": 50,
+      "prior_position": null,
+      "fired": false,
+      "sar_reversed": false,
+      "invalid": false,
+      "contradicted": false
+    }
+  },
+  "signals_fired": 0,
+  "sar_reversals": [],
+  "errors": [],
+  "invalids": [],
+  "contradictions": []
+}
