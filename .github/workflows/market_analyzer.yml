@@ -38,6 +38,27 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python market_analyzer.py
 
+      - name: Commit analyzer summary to repo
+        if: always()
+        run: |
+          if [ ! -f analyzer_summary.json ]; then
+            echo "analyzer_summary.json not found — skipping."
+            exit 0
+          fi
+          TIMESTAMP=$(date -u +"%Y-%m-%d_%H-%M")
+          SUMMARY_DEST="run_summaries/${TIMESTAMP}_analyzer.json"
+          mkdir -p run_summaries
+          cp analyzer_summary.json "$SUMMARY_DEST"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          git add "$SUMMARY_DEST"
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "Analyzer summary: $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Upload strategy log
         uses: actions/upload-artifact@v4
         with:
