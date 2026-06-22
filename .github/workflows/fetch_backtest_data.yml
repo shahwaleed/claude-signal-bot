@@ -24,60 +24,63 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Fetch OHLC data using /ohlc endpoint (days=365)
-        env:
-          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+      - name: Fetch 2 years of daily OHLC from Binance public API
         run: |
           python3 << 'PYEOF'
           import requests, json, time, datetime, os
 
-          API_KEY = os.environ.get("COINGECKO_API_KEY", "")
-          headers = {"x-cg-demo-api-key": API_KEY} if API_KEY else {}
+          # Binance public klines API - no auth required
+          # Endpoint: GET /api/v3/klines
+          # Interval: 1d (daily)
+          # limit: 1000 max per call (1000 days > 2 years)
+          BASE = "https://api.binance.com"
+          SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
 
-          COINS = {
-              "BTCUSDT": "bitcoin",
-              "ETHUSDT": "ethereum",
-              "SOLUSDT": "solana",
-              "XRPUSDT": "ripple",
-          }
+          # 2 years ago in milliseconds
+          end_ms = int(datetime.datetime.now().timestamp() * 1000)
+          start_ms = end_ms - (2 * 365 * 24 * 3600 * 1000)
 
-          # CoinGecko /ohlc with days=365 returns ~365 daily candles
-          # We call it once to get the last year of data
-          # Note: free tier supports days=1,7,14,30,90,180,365 only
           ohlc_data = {}
-          for symbol, coin_id in COINS.items():
-              print(f"Fetching {symbol} ({coin_id}) -- days=365...")
+          for symbol in SYMBOLS:
+              print(f"Fetching {symbol} daily candles...")
               r = requests.get(
-                  f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc",
-                  params={"vs_currency": "usd", "days": "365"},
-                  headers=headers,
+                  f"{BASE}/api/v3/klines",
+                  params={
+                      "symbol": symbol,
+                      "interval": "1d",
+                      "startTime": start_ms,
+                      "endTime": end_ms,
+                      "limit": 1000
+                  },
                   timeout=30
               )
               print(f"  Status: {r.status_code}")
               r.raise_for_status()
+              raw = r.json()
+
               candles = []
-              seen_dates = set()
-              for c in r.json():
+              for c in raw:
+                  # Binance kline format:
+                  # [open_time, open, high, low, close, volume, close_time, ...]
                   dt = datetime.datetime.fromtimestamp(c[0]/1000, tz=datetime.timezone.utc)
-                  date_str = dt.strftime("%Y-%m-%d")
-                  if date_str not in seen_dates:
-                      seen_dates.add(date_str)
-                      candles.append({
-                          "date": date_str,
-                          "ts": c[0],
-                          "open": float(c[1]),
-                          "high": float(c[2]),
-                          "low": float(c[3]),
-                          "close": float(c[4])
-                      })
-              candles.sort(key=lambda x: x["ts"])
+                  candles.append({
+                      "date": dt.strftime("%Y-%m-%d"),
+                      "ts": c[0],
+                      "open": float(c[1]),
+                      "high": float(c[2]),
+                      "low": float(c[3]),
+                      "close": float(c[4]),
+                      "volume": float(c[5])
+                  })
+
               ohlc_data[symbol] = candles
               print(f"  {len(candles)} daily candles: {candles[0]['date']} -> {candles[-1]['date']}")
-              time.sleep(4)
+              time.sleep(1)
 
           output = {
               "fetched_at": datetime.datetime.utcnow().isoformat() + "Z",
-              "description": "~365 days daily OHLC for BTC/ETH/SOL/XRP from CoinGecko /ohlc endpoint",
+              "description": "2-year daily OHLC from Binance public API (no auth)",
+              "source": "Binance /api/v3/klines interval=1d",
               "ohlc": ohlc_data
           }
 
@@ -86,9 +89,8 @@ jobs:
               json.dump(output, f)
 
           size_kb = os.path.getsize("backtest/price_data.json") / 1024
-          print(f"\nWritten backtest/price_data.json ({size_kb:.1f} KB)")
-          total_candles = sum(len(v) for v in ohlc_data.values())
-          print(f"Total candles across all assets: {total_candles}")
+          total = sum(len(v) for v in ohlc_data.values())
+          print(f"\nWritten backtest/price_data.json ({size_kb:.0f} KB, {total} total candles)")
           PYEOF
 
       - name: Commit data to repo
@@ -97,7 +99,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add backtest/price_data.json
           git diff --cached --quiet && echo "No changes" && exit 0
-          git commit -m "Add backtest price data (~365 days daily OHLC for BTC/ETH/SOL/XRP)"
+          git commit -m "Add 2-year backtest price data (Binance daily OHLC, BTC/ETH/SOL/XRP)"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
