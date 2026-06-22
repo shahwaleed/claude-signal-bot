@@ -28,6 +28,18 @@ Fix (June 22 2026): write_run_summary() writes a structured JSON summary
 to run_summary.json at the end of each run. The workflow then commits it
 to run_summaries/YYYY-MM-DD_HH-MM_strategy[_manual].json in the repo so
 Claude can read run history via GitHub MCP without needing browser access.
+
+Fix (June 22 2026, SAR): fire_webhook() now returns (fired, sar_reversed)
+tuple instead of just bool. Run summary now includes:
+  - positions_loaded: what open_positions dict contained at start of run
+  - per-symbol: prior_position, sar_reversed fields
+  - top-level: sar_reversals list
+This makes SAR test results unambiguous: sar_reversed=True confirms the
+full close-then-open reversal path executed, not just a fresh open.
+
+Also: load_positions_from_log() now strips whitespace from CSV fields,
+fixing detection failure when CSV has leading whitespace (e.g. seeded
+files written via bash heredoc).
 """
 
 import requests
@@ -76,7 +88,7 @@ def load_positions_from_log():
             reader = csv.reader(f)
             for row in reader:
                 if len(row) < FIRED_COL+1: continue
-                symbol=row[1]; signal=row[3]; fired=row[FIRED_COL]
+                symbol=row[1].strip(); signal=row[3].strip(); fired=row[FIRED_COL].strip()
                 if symbol in open_positions and signal in ("BUY","SELL") and fired=="True":
                     last[symbol] = signal
         for sym,sig in last.items(): open_positions[sym]=sig
@@ -102,15 +114,11 @@ def calculate_ema(closes, period):
 
 
 def calculate_rsi(closes, period=7):
-    """
-    RSI with flat market fix: ag==0 AND al==0 returns 50.0 (neutral).
-    Old code returned 100.0 on flat markets due to al==0 branch firing first.
-    """
     if len(closes)<period+1: return 50.0
     g=[max(closes[i]-closes[i-1],0) for i in range(1,len(closes))]
     l=[max(closes[i-1]-closes[i],0) for i in range(1,len(closes))]
     ag,al=sum(g[-period:])/period,sum(l[-period:])/period
-    if ag==0 and al==0: return 50.0   # flat market → neutral
+    if ag==0 and al==0: return 50.0
     if al==0: return 100.0
     if ag==0: return 1.0
     return round(100-(100/(1+ag/al)),2)
@@ -121,10 +129,6 @@ def calculate_rsi_series(closes, period=7):
 
 
 def detect_divergence(closes, rsi_series, lookback=8):
-    """
-    RSI divergence with lookback=8 (4 hours on 30m candles).
-    Compares current candle against all 7 prior candles (rc[:-1]).
-    """
     if len(closes)<lookback or len(rsi_series)<lookback: return None
     rc=closes[-lookback:]; rr=rsi_series[-lookback:]
     if rc[-1]<min(rc[:-1]) and not rr[-1]<min(rr[:-1]): return "bullish"
@@ -164,12 +168,7 @@ def validate_signal_response(raw_signal):
     Guarantees a safe, complete dict is returned: {"signal", "confidence",
     "reasoning"}. If raw_signal is missing required fields, has the wrong
     types, or "signal" isn't BUY/SELL/HOLD, returns a safe HOLD/0 result
-    instead of letting a KeyError (or similar) crash the run. The
-    "reasoning" field explains what was wrong, so it's visible in logs/CSV.
-
-    Always runs before detect_signal_contradiction(): that function
-    assumes signal/confidence/reasoning are present and well-typed, so
-    this guarantees those preconditions hold first.
+    instead of letting a KeyError (or similar) crash the run.
     """
     if not isinstance(raw_signal, dict):
         return {"signal": "HOLD", "confidence": 0,
@@ -187,22 +186,6 @@ def validate_signal_response(raw_signal):
 
 
 def detect_signal_contradiction(signal_field, reasoning_text):
-    """
-    Returns True if reasoning_text appears to state an explicit
-    directional conclusion (BUY/SELL) while signal_field == "HOLD".
-
-    Only ever meaningful when signal_field == "HOLD": a BUY or SELL field
-    can't contradict itself under this check, so those are always False.
-
-    Patterns are deliberately narrow (only late-stated CONCLUSIONS, e.g.
-    "Overriding to SELL", "Signal is SELL") rather than any mention of
-    "buy"/"sell" anywhere in the text -- broader matching was tested and
-    produced false positives on legitimate HOLD reasoning like "not
-    enough to justify a buy or sell signal" or "a sell signal would
-    require RSI above 75". Validated against both real failures seen in
-    production (XRP and ETH, June 21 2026) plus 8 legitimate non-matching
-    HOLD reasoning variants -- see test suite used during development.
-    """
     if signal_field != "HOLD":
         return False
     text = reasoning_text.lower()
@@ -263,15 +246,23 @@ def send_close_webhook(symbol, price):
 
 
 def fire_webhook(signal_str, price, symbol):
+    """
+    Returns (fired: bool, sar_reversed: bool).
+    sar_reversed=True means a close webhook was sent before this open,
+    i.e. the full SAR reversal path executed (not just a fresh open).
+    """
     current=open_positions.get(symbol)
     if current==signal_str:
-        print(f"  [SAR] Already in {signal_str} for {symbol} — skipping"); return False
+        print(f"  [SAR] Already in {signal_str} for {symbol} — skipping")
+        return False, False
+    sar_reversed = False
     if current is not None:
         print(f"  [SAR] Reversing {current} → {signal_str} for {symbol}")
         if send_close_webhook(symbol,price):
             print("  [SAR] Waiting 5s..."); time.sleep(5)
+            sar_reversed = True
         else:
-            print("  [SAR] Close failed — aborting"); return False
+            print("  [SAR] Close failed — aborting"); return False, False
     action="enter_long" if signal_str=="BUY" else "enter_short"
     tp=TAKE_PROFIT if signal_str=="BUY" else -TAKE_PROFIT
     r=requests.post(WEBHOOK_URL,json={"secret":WEBHOOK_SECRET,"max_lag":"300",
@@ -282,8 +273,9 @@ def fire_webhook(signal_str, price, symbol):
                "take_profit":{"enabled":True,"steps":[{"order_type":"market","price_percent":tp,"volume_percent":100}]},
                "stop_loss":{"enabled":True,"order_type":"market","trigger_price_percent":STOP_LOSS}},timeout=10)
     if r.status_code==200:
-        print(f"  Webhook {action}: SUCCESS"); open_positions[symbol]=signal_str; return True
-    print(f"  Webhook: {'RATE LIMITED' if r.status_code==429 else f'FAILED [{r.status_code}]'} {r.text}"); return False
+        print(f"  Webhook {action}: SUCCESS"); open_positions[symbol]=signal_str; return True, sar_reversed
+    print(f"  Webhook: {'RATE LIMITED' if r.status_code==429 else f'FAILED [{r.status_code}]'} {r.text}")
+    return False, False
 
 
 def log_result(symbol, signal, ind, price, fired):
@@ -303,11 +295,6 @@ def log_result(symbol, signal, ind, price, fired):
 
 
 def write_run_summary(summary):
-    """
-    Writes run_summary.json to disk. The workflow then commits this file
-    to run_summaries/YYYY-MM-DD_HH-MM_strategy[_manual].json in the repo
-    so Claude can read full run history via GitHub MCP.
-    """
     with open(SUMMARY_FILE, "w") as f:
         json.dump(summary, f, indent=2)
     print(f"\n  Run summary written to {SUMMARY_FILE}")
@@ -322,8 +309,10 @@ def run():
     summary = {
         "run_at_dubai": now.strftime("%Y-%m-%d %H:%M:%S"),
         "strategy": "ema_advanced",
+        "positions_loaded": dict(open_positions),
         "symbols": {},
         "signals_fired": 0,
+        "sar_reversals": [],
         "errors": [],
         "invalids": [],
         "contradictions": [],
@@ -362,11 +351,14 @@ def run():
                 else:
                     print(f"  Signal:{signal['signal']} Conf:{signal['confidence']}% | {signal.get('reasoning','')}")
 
-            fired=False
+            fired = False
+            sar_reversed = False
             if not is_invalid and not contradicted and signal["signal"] in ("BUY","SELL") and signal["confidence"]>=MIN_CONFIDENCE:
-                fired=fire_webhook(signal["signal"],price,symbol)
+                fired, sar_reversed = fire_webhook(signal["signal"],price,symbol)
                 if fired:
                     summary["signals_fired"] += 1
+                if sar_reversed:
+                    summary["sar_reversals"].append(symbol)
             elif not is_invalid and not contradicted:
                 print("  HOLD — no webhook fired.")
 
@@ -374,7 +366,9 @@ def run():
             summary["symbols"][symbol] = {
                 "signal": signal["signal"],
                 "confidence": signal["confidence"],
+                "prior_position": summary["positions_loaded"].get(symbol),
                 "fired": fired,
+                "sar_reversed": sar_reversed,
                 "invalid": is_invalid,
                 "contradicted": contradicted,
             }
@@ -385,7 +379,9 @@ def run():
             summary["symbols"][symbol] = {
                 "signal": "ERROR",
                 "confidence": 0,
+                "prior_position": summary["positions_loaded"].get(symbol),
                 "fired": False,
+                "sar_reversed": False,
                 "invalid": False,
                 "contradicted": False,
             }
