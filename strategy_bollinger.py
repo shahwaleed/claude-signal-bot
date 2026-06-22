@@ -4,6 +4,13 @@ Backtested: 868 trades across 8 years (Jun 2017 – Apr 2026)
 Result:     +0.389% avg/trade, 45.2% WR, +338% total, ~42% annual return on allocated capital
 
 Fix: tv_instrument uses raw symbol format (BTCUSDT not BTC/USDT) for Spot Binance webhooks
+
+Fix (June 22 2026): write_run_summary() writes a structured JSON summary
+to run_summary.json at the end of each run. The workflow then commits it
+to run_summaries/YYYY-MM-DD_HH-MM_strategy[_manual].json in the repo so
+Claude can read run history via GitHub MCP without needing browser access.
+Note: this strategy never calls the Claude model (pure deterministic math),
+so there are no invalids or contradictions to track -- only signals and errors.
 """
 
 import requests, json, re, csv, time, os, math
@@ -37,6 +44,7 @@ STOP_LOSS   = 3.0
 TP_MIN      = 0.5
 TP_MAX      = 5.0
 LOG_FILE    = "trade_log_bollinger.csv"
+SUMMARY_FILE = "run_summary.json"
 
 RSI_BUY_THRESHOLD = {"BTCUSDT": 20, "ETHUSDT": 20, "SOLUSDT": 20, "XRPUSDT": 15}
 TP_MIN_SYMBOL     = {"BTCUSDT": 1.5, "ETHUSDT": 1.5, "SOLUSDT": 1.5, "XRPUSDT": 2.5}
@@ -203,12 +211,32 @@ def log_result(symbol, price, signal, tp_pct, reason, fired):
     print(f"  Reason: {reason}")
 
 
+def write_run_summary(summary):
+    """
+    Writes run_summary.json to disk. The workflow then commits this file
+    to run_summaries/YYYY-MM-DD_HH-MM_strategy[_manual].json in the repo
+    so Claude can read full run history via GitHub MCP.
+    """
+    with open(SUMMARY_FILE, "w") as f:
+        json.dump(summary, f, indent=2)
+    print(f"\n  Run summary written to {SUMMARY_FILE}")
+
+
 def run():
-    now = datetime.now(tz=DUBAI_TZ).strftime("%Y-%m-%d %H:%M")
+    now = datetime.now(tz=DUBAI_TZ)
+    now_str = now.strftime("%Y-%m-%d %H:%M")
     print(f"\n{'='*60}")
-    print(f"Bollinger Band v18 — {now} Dubai time")
+    print(f"Bollinger Band v18 — {now_str} Dubai time")
     print(f"Strategy: BUY only, RSI extreme oversold, all 4 pairs")
     print(f"{'='*60}")
+
+    summary = {
+        "run_at_dubai": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "strategy": "bollinger",
+        "symbols": {},
+        "signals_fired": 0,
+        "errors": [],
+    }
 
     for symbol in SYMBOLS:
         print(f"\n--- {symbol} ---")
@@ -242,16 +270,32 @@ def run():
             if signal == "BUY":
                 print(f"  ✅ BUY signal | TP: {tp_pct:.2f}% | SL: {STOP_LOSS}%")
                 fired = fire_webhook(symbol, price, tp_pct)
+                if fired:
+                    summary["signals_fired"] += 1
             else:
                 print(f"  ⏸️  HOLD — {reason}")
 
             log_result(symbol, price, signal, tp_pct or 0, reason, fired)
+            summary["symbols"][symbol] = {
+                "signal": signal or "HOLD",
+                "tp_pct": round(tp_pct, 2) if tp_pct else 0,
+                "fired": fired,
+                "reason": reason,
+            }
             time.sleep(2)
 
         except Exception as e:
             print(f"  ERROR: {e}")
             import traceback; traceback.print_exc()
+            summary["errors"].append({"symbol": symbol, "error": str(e)})
+            summary["symbols"][symbol] = {
+                "signal": "ERROR",
+                "tp_pct": 0,
+                "fired": False,
+                "reason": str(e),
+            }
 
+    write_run_summary(summary)
     print(f"\n{'='*60}")
     print("Run complete.")
     print(f"{'='*60}\n")
