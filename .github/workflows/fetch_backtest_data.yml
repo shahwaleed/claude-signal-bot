@@ -1,0 +1,140 @@
+name: Fetch Backtest Data
+
+# One-shot workflow to fetch 2 years of daily OHLC data for BTC/ETH/SOL/XRP
+# and commit it as backtest/price_data.json for use in backtest.py
+# Delete this workflow after data is fetched.
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch 2 years of daily OHLC data
+        env:
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+        run: |
+          python3 << 'PYEOF'
+          import requests, json, time, datetime, os
+
+          API_KEY = os.environ.get("COINGECKO_API_KEY", "")
+          headers = {"x-cg-demo-api-key": API_KEY} if API_KEY else {}
+
+          COINS = {
+              "BTCUSDT": "bitcoin",
+              "ETHUSDT": "ethereum",
+              "SOLUSDT": "solana",
+              "XRPUSDT": "ripple",
+          }
+
+          end_ts = int(datetime.datetime.now().timestamp())
+          start_ts = end_ts - (2 * 365 * 24 * 3600)  # 2 years ago
+
+          all_data = {}
+
+          for symbol, coin_id in COINS.items():
+              print(f"Fetching {symbol} ({coin_id})...")
+              # market_chart/range returns daily candles for ranges > 90 days
+              r = requests.get(
+                  f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart/range",
+                  params={"vs_currency": "usd", "from": start_ts, "to": end_ts},
+                  headers=headers,
+                  timeout=30
+              )
+              r.raise_for_status()
+              data = r.json()
+
+              prices = data.get("prices", [])
+              volumes = {v[0]: v[1] for v in data.get("total_volumes", [])}
+
+              # market_chart/range gives prices and market_caps but not OHLC directly
+              # For OHLC use the ohlc endpoint with days=365 twice
+              candles = []
+              for ts, price in prices:
+                  dt = datetime.datetime.fromtimestamp(ts/1000, tz=datetime.timezone.utc)
+                  candles.append({
+                      "date": dt.strftime("%Y-%m-%d"),
+                      "ts": ts,
+                      "close": price,
+                      "volume": volumes.get(ts, 0)
+                  })
+
+              all_data[symbol] = candles
+              print(f"  {len(candles)} daily points: {candles[0]['date']} → {candles[-1]['date']}")
+              time.sleep(3)
+
+          # Also fetch OHLC (open/high/low/close) for better signal accuracy
+          print("\nFetching OHLC data (365 days each call, 2 calls per asset)...")
+          ohlc_data = {}
+          for symbol, coin_id in COINS.items():
+              ohlc_all = []
+              for days in [365, 365]:
+                  r = requests.get(
+                      f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc",
+                      params={"vs_currency": "usd", "days": str(days)},
+                      headers=headers,
+                      timeout=30
+                  )
+                  if r.status_code == 200:
+                      for c in r.json():
+                          dt = datetime.datetime.fromtimestamp(c[0]/1000, tz=datetime.timezone.utc)
+                          ohlc_all.append({
+                              "date": dt.strftime("%Y-%m-%d"),
+                              "ts": c[0],
+                              "open": c[1],
+                              "high": c[2],
+                              "low": c[3],
+                              "close": c[4]
+                          })
+                  time.sleep(3)
+              # Deduplicate by date, keep most recent
+              seen = {}
+              for c in ohlc_all:
+                  seen[c["date"]] = c
+              ohlc_data[symbol] = sorted(seen.values(), key=lambda x: x["ts"])
+              print(f"  {symbol}: {len(ohlc_data[symbol])} OHLC candles")
+
+          output = {
+              "fetched_at": datetime.datetime.utcnow().isoformat() + "Z",
+              "description": "2-year daily price data for BTC/ETH/SOL/XRP from CoinGecko",
+              "price_series": all_data,
+              "ohlc": ohlc_data
+          }
+
+          import os
+          os.makedirs("backtest", exist_ok=True)
+          with open("backtest/price_data.json", "w") as f:
+              json.dump(output, f, indent=2)
+
+          total_mb = len(json.dumps(output)) / 1024 / 1024
+          print(f"\nWritten backtest/price_data.json ({total_mb:.2f} MB)")
+          PYEOF
+
+      - name: Commit data to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backtest/price_data.json
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "Add 2-year backtest price data (BTC/ETH/SOL/XRP daily)"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
