@@ -1,0 +1,66 @@
+{
+  "run_at_dubai": "2026-06-23 06:01:10",
+  "strategy_chosen": "bollinger",
+  "secondary_strategy": "ema_basic",
+  "confidence": 72,
+  "market_condition": "Mixed/choppy market with no clear alignment, avg RSI 46.7 in ranging zone, no divergences, no extreme modes",
+  "reasoning": "Rule 8 fires: no divergences, no crash/overbought/recovering modes, no bullish-aligned assets, avg RSI 35-65 indicates ranging/choppy market \u2014 bollinger is the default handler",
+  "key_signals": [
+    "All 4 assets unaligned across timeframes (30m bearish vs 4h bullish vs 1d bearish)",
+    "SOL 30m RSI at 15.18 and XRP 30m RSI at 1.0 indicate extreme short-term oversold conditions \u2014 potential BUY signals",
+    "ETH 1d RSI at 20.36 and BTC 1d RSI at 28.44 suggest daily timeframe weakness near oversold territory",
+    "avg RSI_4h=46.7 confirms ranging market with no directional conviction",
+    "ATR avg 1.22% below 1.5% threshold \u2014 low volatility supports mean reversion over trend-following"
+  ],
+  "error": null,
+  "assets": {
+    "BTC": {
+      "rsi_4h": 48.78,
+      "rsi_30m": 36.57,
+      "trend_4h": "bullish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 0.8605
+    },
+    "ETH": {
+      "rsi_4h": 46.85,
+      "rsi_30m": 40.29,
+      "trend_4h": "bullish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.0887
+    },
+    "SOL": {
+      "rsi_4h": 49.63,
+      "rsi_30m": 15.18,
+      "trend_4h": "bullish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.6813
+    },
+    "XRP": {
+      "rsi_4h": 41.67,
+      "rsi_30m": 1.0,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.2642
+    }
+  }
+}
