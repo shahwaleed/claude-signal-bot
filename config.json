@@ -1,15 +1,13 @@
 {
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
-  "confidence": 82,
-  "market_condition": "Broad bearish selloff across all assets, RSI values deeply oversold (avg 4h RSI 31.4), no divergence signals, no crash/recovering mode triggered but approaching oversold extremes",
-  "reasoning": "Rules 1-5 don't fire (no divergence, no crash/overbought/recovering mode on 2+ assets), rules 6-7 fail (0 bullish aligned assets), rule 8 applies as market is choppy/oversold with avg RSI near 35 range; bollinger is the correct default for this oversold ranging condition",
+  "confidence": 88,
+  "market_condition": "Recovering/oversold market with 3 assets in recovering_mode, avg RSI_4h at 30.8 \u2014 deeply oversold across the board",
+  "reasoning": "Rule 5 fired: recovering_mode=True on 3/4 assets (BTC, ETH, SOL), triggering bollinger mean reversion strategy for oversold bounce plays",
   "key_signals": [
-    "Avg 4h RSI=31.4 \u2014 deeply oversold, approaching crash territory",
-    "All 4 assets fully bearish-aligned across 30m/4h/1d timeframes",
-    "SOL 4h RSI=28.28 and BTC 1d RSI=28.44 nearing crash_mode threshold of 25",
-    "ETH 1d RSI=20.36 \u2014 extreme oversold on daily timeframe",
-    "No divergence signals present \u2014 no reversal confirmation yet"
+    "3/4 assets in recovering_mode with RSI_4h 25-35 range",
+    "avg RSI_4h=30.8 \u2014 deeply oversold, near lower Bollinger Bands",
+    "All 4 assets fully bearish-aligned across 30m/4h/1d \u2014 no reversal confirmed yet, mean reversion caution advised"
   ],
-  "updated_at_dubai": "2026-06-23 18:01:32"
+  "updated_at_dubai": "2026-06-24 00:01:10"
 }
