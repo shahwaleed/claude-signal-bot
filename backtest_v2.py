@@ -5,7 +5,7 @@ Data in:  /Users/Waleed-Macbook-Air/Documents/Python Scripts/data/
 
 Usage:
     cd "/Users/Waleed-Macbook-Air/Documents/Python Scripts"
-    pip install pandas numpy
+    pip3 install pandas numpy
     python3 backtest_v2.py
 
 Settings:
@@ -13,6 +13,10 @@ Settings:
     Allocation per bot: 25% of portfolio
     Fee: 0.1% per trade (entry + exit)
     Period: 2020-08-11 to 2026-04-30
+
+Fix v2: Only generate a new signal when no position is open.
+    In production, a position stays open until 3Commas hits TP or SL.
+    SAR (reverse) only applies to ema_advanced and vwap strategies.
 """
 
 import pandas as pd
@@ -37,6 +41,8 @@ STRATEGY_CONFIG = {
     "ema_advanced":   {"sl": 3.0, "long_only": False},
     "ema_basic":      {"sl": 3.0, "long_only": False},
 }
+
+SAR_STRATEGIES = {"ema_advanced", "vwap"}
 
 
 # ── INDICATORS ────────────────────────────────────────────────────────
@@ -261,13 +267,19 @@ def run():
                                    'edt':str(pos['edt']),'xdt':str(ts),'pnl':net,'r':er,'s':strategy})
                     positions[sym]=None; pos=None
 
+            # Only generate signal when no position is open.
+            # In production, a position stays open until 3Commas hits TP or SL.
+            # SAR (reverse) is only valid for ema_advanced and vwap strategies.
+            if pos is not None and strategy not in SAR_STRATEGIES:
+                continue  # already in a trade, wait for TP/SL exit
+
             sig, tp_pct = signal(strategy, sym, ts, ind)
             if cfg['long_only'] and sig=='SELL': sig='HOLD'
 
             if sig in ('BUY','SELL'):
                 d = 'long' if sig=='BUY' else 'short'
-                # SAR
-                if pos and pos['dir']!=d:
+                # SAR: close opposite position first (ema_advanced and vwap only)
+                if pos and pos['dir']!=d and strategy in SAR_STRATEGIES:
                     pnl=(price-pos['e'])/pos['e']*pos['sz'] if pos['dir']=='long' else (pos['e']-price)/pos['e']*pos['sz']
                     net=pnl-pos['sz']*FEE_RATE
                     portfolio+=net
@@ -285,7 +297,7 @@ def run():
             for sym in SYMBOLS:
                 pos=positions[sym]
                 if not pos: continue
-                p=ind_all[sym]['close_30m'].get(ts, pos['e']) if hasattr(ind_all[sym]['close_30m'],'get') else (ind_all[sym]['close_30m'].loc[ts] if ts in ind_all[sym]['close_30m'].index else pos['e'])
+                p=ind_all[sym]['close_30m'].loc[ts] if ts in ind_all[sym]['close_30m'].index else pos['e']
                 unr += (p-pos['e'])/pos['e']*pos['sz'] if pos['dir']=='long' else (pos['e']-p)/pos['e']*pos['sz']
             equity.append({'dt':str(ts)[:10],'eq':round(portfolio+unr,2)})
 
