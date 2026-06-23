@@ -1,15 +1,15 @@
 {
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
-  "confidence": 72,
-  "market_condition": "Ranging/choppy market with bearish pressure across timeframes, avg RSI near 50, no clear trend alignment",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, no bullish-aligned assets); Rule 8 fires \u2014 ranging/choppy market with avg RSI 49.5 in the 35-65 zone defaults to bollinger.",
+  "confidence": 82,
+  "market_condition": "Broad bearish selloff across all assets, RSI values deeply oversold (avg 4h RSI 31.4), no divergence signals, no crash/recovering mode triggered but approaching oversold extremes",
+  "reasoning": "Rules 1-5 don't fire (no divergence, no crash/overbought/recovering mode on 2+ assets), rules 6-7 fail (0 bullish aligned assets), rule 8 applies as market is choppy/oversold with avg RSI near 35 range; bollinger is the correct default for this oversold ranging condition",
   "key_signals": [
-    "avg RSI_4h=49.5 in ranging zone (35-65)",
-    "0/4 assets bullish-aligned \u2014 no trend confirmation",
-    "All assets bearish on 30m and 1d, mixed on 4h \u2014 choppy/indecisive",
-    "ETH 1d RSI=20.36 and XRP 1d RSI=29.17 approaching oversold on daily",
-    "avg ATR=1.22% below 1.5% threshold \u2014 low volatility, mean reversion favored"
+    "Avg 4h RSI=31.4 \u2014 deeply oversold, approaching crash territory",
+    "All 4 assets fully bearish-aligned across 30m/4h/1d timeframes",
+    "SOL 4h RSI=28.28 and BTC 1d RSI=28.44 nearing crash_mode threshold of 25",
+    "ETH 1d RSI=20.36 \u2014 extreme oversold on daily timeframe",
+    "No divergence signals present \u2014 no reversal confirmation yet"
   ],
-  "updated_at_dubai": "2026-06-23 12:01:11"
+  "updated_at_dubai": "2026-06-23 18:01:32"
 }
