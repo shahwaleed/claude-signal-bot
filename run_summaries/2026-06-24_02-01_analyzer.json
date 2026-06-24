@@ -1,0 +1,66 @@
+{
+  "run_at_dubai": "2026-06-24 06:01:08",
+  "strategy_chosen": "bollinger",
+  "secondary_strategy": "ema_basic",
+  "confidence": 82,
+  "market_condition": "Bearish across all timeframes with 2 assets in recovering mode, short-term overbought on 30m RSI, 4h RSI oversold zone",
+  "reasoning": "Rule 5 fired: recovering_mode=True on 2+ assets (SOL and XRP), plus 4h RSIs broadly oversold (avg 33.7), making bollinger the correct mean-reversion approach.",
+  "key_signals": [
+    "recovering_mode triggered on SOL (RSI_4h=29.17) and XRP (RSI_4h=34.62)",
+    "avg RSI_4h=33.7 \u2014 deeply oversold on 4h, signaling potential bounce",
+    "30m RSI extremely overbought on XRP (86.67) and ETH (79.55) \u2014 short-term pullback risk within broader downtrend",
+    "All 4 assets misaligned across timeframes \u2014 no trend-following setup valid",
+    "BTC 1d RSI=28.67 approaching crash territory \u2014 watch for further downside"
+  ],
+  "error": null,
+  "assets": {
+    "BTC": {
+      "rsi_4h": 35.93,
+      "rsi_30m": 73.86,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.1199
+    },
+    "ETH": {
+      "rsi_4h": 35.19,
+      "rsi_30m": 79.55,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.4606
+    },
+    "SOL": {
+      "rsi_4h": 29.17,
+      "rsi_30m": 78.13,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": true,
+      "atr_pct_4h": 1.7034
+    },
+    "XRP": {
+      "rsi_4h": 34.62,
+      "rsi_30m": 86.67,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": true,
+      "atr_pct_4h": 1.435
+    }
+  }
+}
