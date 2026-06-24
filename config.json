@@ -1,15 +1,13 @@
 {
-  "strategy": "bollinger",
-  "secondary_strategy": "ema_basic",
-  "confidence": 78,
-  "market_condition": "Broad bearish trend with oversold RSI levels across all assets, no divergence signals",
-  "reasoning": "Rules 1-7 don't fire (no divergence, no crash/overbought/recovering modes, no bullish alignment); Rule 8/9 apply \u2014 avg RSI 32.9 is below 35 but all assets are deeply oversold near lower Bollinger Bands, making bollinger mean reversion the best fit as the default strategy for this oversold, non-trending condition.",
+  "strategy": "rsi_divergence",
+  "secondary_strategy": "bollinger",
+  "confidence": 82,
+  "market_condition": "Extreme oversold conditions with bullish divergence across 3/4 assets and avg RSI_4h of 18.3",
+  "reasoning": "Rule 1 fires: bullish divergence confirmed on 3+ assets (BTC, ETH, XRP) AND avg RSI_4h=18.3 is well below 50, signaling a high-probability oversold reversal.",
   "key_signals": [
-    "Avg RSI_4h=32.9, deeply oversold across BTC/ETH/SOL/XRP",
-    "All 4 assets bearish-aligned on 30m+4h+1d \u2014 sustained selling pressure",
-    "SOL 4h RSI=26.68 near crash threshold; ETH 1d RSI=20.08 extremely oversold",
-    "No bullish divergence to confirm reversal \u2014 caution on longs",
-    "ATR avg=1.27%, below 1.5% threshold \u2014 low volatility for this selloff"
+    "Bullish divergence on BTC (RSI_4h=20.08), ETH (RSI_4h=20.37), XRP (RSI_4h=18.94) \u2014 3/4 assets confirmed",
+    "Avg RSI_4h=18.3 \u2014 deeply oversold, far below the 50 threshold required for Rule 1",
+    "SOL in crash_mode with RSI_4h=13.74, reinforcing extreme oversold market-wide conditions"
   ],
-  "updated_at_dubai": "2026-06-24 18:01:15"
+  "updated_at_dubai": "2026-06-25 00:01:04"
 }
