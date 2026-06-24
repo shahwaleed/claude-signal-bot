@@ -3,11 +3,12 @@ backtest_bollinger.py
 Backtests strategy_bollinger.py signal logic on historical 30m + 4h candles.
 No Claude API calls — pure rule-based signal replication.
 
-Key things being tested:
-  1. Overall P&L and win rate across 4 symbols (2017-2026)
-  2. Compounding portfolio — each trade uses 25% of current portfolio value
-  3. Fees — 0.1% entry + 0.1% exit per trade
-  4. Monthly P&L breakdown — net dollar return per month
+Compounding portfolio model:
+  - free_cash tracks available capital only (locked capital removed at entry)
+  - size = min(total_capital * 25%, free_cash) — correct 3Commas allocation
+  - Fees: 0.1% entry + 0.1% exit deducted per trade
+  - portfolio_after = free_cash + all locked capital (total, not just free)
+  - Exits processed before entries at same timestamp (capital freed first)
 
 Usage:
     python3 backtest_bollinger.py
@@ -26,8 +27,9 @@ RESULTS_DIR = "results"
 SYMBOLS     = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
 
 STARTING_CAPITAL = 1000.0
-ALLOCATION       = 0.25      # 25% of portfolio per bot
+ALLOCATION       = 0.25      # 25% of total portfolio per bot
 FEE_RATE         = 0.001     # 0.1% per side
+MIN_TRADE_SIZE   = 1.0       # skip entry if less than $1 available
 
 STOP_LOSS        = 3.0
 TP_MIN, TP_MAX   = 0.5, 5.0
@@ -238,72 +240,124 @@ def run():
         print(f"  {sym}: {n} trades")
 
     # ── COMPOUNDING PORTFOLIO SIMULATION ──────────────────────
-    # Sort all trades by ENTRY time to simulate concurrent positions correctly.
-    # At entry: deduct fee on allocated size.
-    # At exit:  apply P&L and deduct exit fee.
-    # Portfolio value is the running cash balance (unrealized P&L not tracked
-    # between entry and exit — size is locked at entry-time portfolio value).
+    # Correct free-cash model:
+    #   free_cash  = available capital (not deployed)
+    #   open_pos   = locked capital (removed from free_cash at entry)
+    #   total      = free_cash + locked (used for sizing: 25% of total)
+    #
+    # Entry:
+    #   size = min(total * ALLOC, free_cash)  — cap at available cash
+    #   free_cash -= size + entry_fee          — lock capital + pay fee
+    #   open_pos[sym] = {capital: size, ...}
+    #
+    # Exit:
+    #   net = capital * pnl_pct/100 - exit_fee
+    #   free_cash += capital + net             — return capital + profit/loss
+    #   portfolio_after = free_cash + remaining locked capital
 
     print("\nSimulating compounding portfolio...")
     raw_trades.sort(key=lambda t: t["entry_ts"])
 
-    portfolio = STARTING_CAPITAL
-    open_positions = {}   # sym -> {size_usd, entry_ts, ...}
-    completed = []        # final trades with dollar P&L
+    free_cash = STARTING_CAPITAL
+    open_pos  = {}    # sym -> {capital, pnl_pct, exit_ts, result, entry_ts, direction, tp_pct, entry_price, exit_price}
+    completed = []
 
-    # We need to process events in time order (both entries and exits)
+    # Build events: exits BEFORE entries at same timestamp
     events = []
-    for i, t in enumerate(raw_trades):
-        events.append(("entry", t["entry_ts"], i, t))
-        events.append(("exit",  t["exit_ts"],  i, t))
-    events.sort(key=lambda e: (e[1], 0 if e[0]=="entry" else 1))
+    for t in raw_trades:
+        events.append(("exit",  t["exit_ts"],  t))
+        events.append(("entry", t["entry_ts"], t))
+    events.sort(key=lambda e: (e[1], 0 if e[0] == "exit" else 1))
 
-    for ev_type, ev_ts, idx, t in events:
+    for ev_type, ev_ts, t in events:
+        sym = t["symbol"]
+        locked = sum(p["capital"] for p in open_pos.values())
+        total  = free_cash + locked
+
         if ev_type == "entry":
-            # Don't re-enter if already in a position for this symbol
-            if t["symbol"] in open_positions:
-                continue
-            size_usd = portfolio * ALLOCATION
-            entry_fee = size_usd * FEE_RATE
-            portfolio -= entry_fee
-            open_positions[t["symbol"]] = {
-                "idx": idx, "size_usd": size_usd,
-                "entry_ts": t["entry_ts"], "entry": t["entry"],
-                "tp_pct": t["tp_pct"], "result": t["result"],
-                "pnl_pct": t["pnl_pct"], "exit_ts": t["exit_ts"],
-                "exit_price": t["exit_price"],
+            if sym in open_pos:
+                continue  # already in a trade on this symbol
+            size = min(total * ALLOCATION, free_cash)
+            if size < MIN_TRADE_SIZE:
+                continue  # not enough free capital
+            entry_fee = size * FEE_RATE
+            free_cash -= (size + entry_fee)
+            open_pos[sym] = {
+                "capital":     size,
+                "pnl_pct":     t["pnl_pct"],
+                "exit_ts":     t["exit_ts"],
+                "result":      t["result"],
+                "entry_ts":    t["entry_ts"],
+                "direction":   t["direction"],
+                "tp_pct":      t["tp_pct"],
+                "entry_price": t["entry"],
+                "exit_price":  t["exit_price"],
             }
-        else:  # exit
-            pos = open_positions.get(t["symbol"])
-            if pos is None: continue
-            # Make sure this exit matches the open position
-            if pos["entry_ts"] != t["entry_ts"]: continue
 
-            pnl_usd  = pos["size_usd"] * pos["pnl_pct"] / 100
-            exit_fee = pos["size_usd"] * FEE_RATE
+        else:  # exit
+            pos = open_pos.get(sym)
+            if pos is None: continue
+            if pos["entry_ts"] != t["entry_ts"]: continue  # stale match
+
+            pnl_usd  = pos["capital"] * pos["pnl_pct"] / 100
+            exit_fee = pos["capital"] * FEE_RATE
             net_usd  = pnl_usd - exit_fee
-            portfolio += pos["size_usd"] + net_usd  # return capital + net profit
+            free_cash += pos["capital"] + net_usd
+            del open_pos[sym]
+
+            # portfolio_after = free_cash + all remaining locked capital
+            remaining_locked = sum(p["capital"] for p in open_pos.values())
+            portfolio_total  = free_cash + remaining_locked
 
             dt_entry = datetime.fromtimestamp(pos["entry_ts"]/1000, tz=timezone.utc)
             dt_exit  = datetime.fromtimestamp(pos["exit_ts"]/1000,  tz=timezone.utc)
             completed.append({
-                "symbol":        t["symbol"],
-                "direction":     t["direction"],
-                "entry_dt":      dt_entry.strftime("%Y-%m-%d %H:%M"),
-                "exit_dt":       dt_exit.strftime("%Y-%m-%d %H:%M"),
-                "entry_price":   round(pos["entry"], 4),
-                "exit_price":    round(pos["exit_price"], 4),
-                "tp_pct":        pos["tp_pct"],
-                "result":        pos["result"],
-                "pnl_pct":       pos["pnl_pct"],
-                "size_usd":      round(pos["size_usd"], 4),
-                "pnl_usd":       round(net_usd, 4),
-                "portfolio_after": round(portfolio, 2),
-                "exit_month":    dt_exit.strftime("%Y-%m"),
+                "symbol":          sym,
+                "direction":       pos["direction"],
+                "entry_dt":        dt_entry.strftime("%Y-%m-%d %H:%M"),
+                "exit_dt":         dt_exit.strftime("%Y-%m-%d %H:%M"),
+                "entry_price":     round(pos["entry_price"], 4),
+                "exit_price":      round(pos["exit_price"], 4),
+                "tp_pct":          pos["tp_pct"],
+                "result":          pos["result"],
+                "pnl_pct":         pos["pnl_pct"],
+                "size_usd":        round(pos["capital"], 4),
+                "pnl_usd":         round(net_usd, 4),
+                "portfolio_after": round(portfolio_total, 2),
+                "exit_month":      dt_exit.strftime("%Y-%m"),
             })
-            del open_positions[t["symbol"]]
 
-    # Save detailed trades CSV
+    # Any positions still open at end of data
+    for sym, pos in list(open_pos.items()):
+        # close at last available price (already simulated in raw_trades)
+        pnl_usd  = pos["capital"] * pos["pnl_pct"] / 100
+        exit_fee = pos["capital"] * FEE_RATE
+        net_usd  = pnl_usd - exit_fee
+        free_cash += pos["capital"] + net_usd
+        del open_pos[sym]
+        remaining_locked = sum(p["capital"] for p in open_pos.values())
+        portfolio_total  = free_cash + remaining_locked
+        dt_entry = datetime.fromtimestamp(pos["entry_ts"]/1000, tz=timezone.utc)
+        dt_exit  = datetime.fromtimestamp(pos["exit_ts"]/1000,  tz=timezone.utc)
+        completed.append({
+            "symbol":          sym,
+            "direction":       pos["direction"],
+            "entry_dt":        dt_entry.strftime("%Y-%m-%d %H:%M"),
+            "exit_dt":         dt_exit.strftime("%Y-%m-%d %H:%M"),
+            "entry_price":     round(pos["entry_price"], 4),
+            "exit_price":      round(pos["exit_price"], 4),
+            "tp_pct":          pos["tp_pct"],
+            "result":          pos["result"],
+            "pnl_pct":         pos["pnl_pct"],
+            "size_usd":        round(pos["capital"], 4),
+            "pnl_usd":         round(net_usd, 4),
+            "portfolio_after": round(portfolio_total, 2),
+            "exit_month":      dt_exit.strftime("%Y-%m"),
+        })
+
+    completed.sort(key=lambda t: t["exit_dt"])
+
+    # Save trades CSV
     trades_csv = os.path.join(RESULTS_DIR, "bollinger_trades.csv")
     if completed:
         with open(trades_csv, "w", newline="") as f:
@@ -311,59 +365,55 @@ def run():
             w.writeheader(); w.writerows(completed)
 
     # ── MONTHLY BREAKDOWN ──────────────────────────────────────
-    monthly = defaultdict(lambda: {"trades": 0, "wins": 0, "pnl_usd": 0.0, "start_portfolio": None, "end_portfolio": 0.0})
+    monthly = defaultdict(lambda: {"trades": 0, "wins": 0, "pnl_usd": 0.0, "end_portfolio": 0.0})
     for t in completed:
         m = t["exit_month"]
         monthly[m]["trades"] += 1
         if t["result"] == "tp": monthly[m]["wins"] += 1
-        monthly[m]["pnl_usd"] += t["pnl_usd"]
-        monthly[m]["end_portfolio"] = t["portfolio_after"]
-
-    # Fill start portfolio for each month
-    prev_end = STARTING_CAPITAL
-    for m in sorted(monthly.keys()):
-        monthly[m]["start_portfolio"] = prev_end
-        prev_end = monthly[m]["end_portfolio"]
+        monthly[m]["pnl_usd"]       += t["pnl_usd"]
+        monthly[m]["end_portfolio"]  = t["portfolio_after"]
 
     # ── REPORT ────────────────────────────────────────────────
-    total     = len(completed)
-    wins      = sum(1 for t in completed if t["result"]=="tp")
-    losses    = sum(1 for t in completed if t["result"]=="sl")
-    timeouts  = sum(1 for t in completed if t["result"]=="timeout")
-    win_rate  = wins/total*100 if total else 0
-    total_pnl_usd  = sum(t["pnl_usd"] for t in completed)
-    total_fees = sum(t["size_usd"]*FEE_RATE*2 for t in completed)
-    final_portfolio = portfolio
+    total    = len(completed)
+    wins     = sum(1 for t in completed if t["result"] == "tp")
+    losses   = sum(1 for t in completed if t["result"] == "sl")
+    timeouts = sum(1 for t in completed if t["result"] == "timeout")
+    win_rate = wins/total*100 if total else 0
+
+    total_pnl_usd = sum(t["pnl_usd"] for t in completed)
+    total_fees    = sum(t["size_usd"] * FEE_RATE * 2 for t in completed)
+    final_portfolio = free_cash  # all positions closed
+
     total_return = (final_portfolio - STARTING_CAPITAL) / STARTING_CAPITAL * 100
 
     # CAGR
     if completed:
-        first_dt = datetime.strptime(completed[0]["entry_dt"],  "%Y-%m-%d %H:%M")
-        last_dt  = datetime.strptime(completed[-1]["exit_dt"],  "%Y-%m-%d %H:%M")
-        years    = (last_dt - first_dt).days / 365.25
-        cagr     = ((final_portfolio/STARTING_CAPITAL)**(1/years)-1)*100 if years>0 else 0
+        first_dt = datetime.strptime(completed[0]["entry_dt"], "%Y-%m-%d %H:%M")
+        last_dt  = datetime.strptime(completed[-1]["exit_dt"], "%Y-%m-%d %H:%M")
+        years    = max((last_dt - first_dt).days / 365.25, 0.01)
+        cagr     = ((final_portfolio / STARTING_CAPITAL) ** (1/years) - 1) * 100
     else:
         years = 0; cagr = 0
 
-    # Max drawdown
+    # Max drawdown (on total portfolio at each exit)
     peak = STARTING_CAPITAL; mdd = 0.0
-    running = STARTING_CAPITAL
     for t in completed:
-        running = t["portfolio_after"]
-        if running > peak: peak = running
-        dd = (peak - running) / peak * 100
+        val = t["portfolio_after"]
+        if val > peak: peak = val
+        dd = (peak - val) / peak * 100
         if dd > mdd: mdd = dd
 
     # Monthly stats
+    n_months = len(monthly)
     profitable_months = sum(1 for d in monthly.values() if d["pnl_usd"] > 0)
-    avg_monthly_pnl   = sum(d["pnl_usd"] for d in monthly.values()) / len(monthly) if monthly else 0
+    avg_monthly_pnl   = total_pnl_usd / n_months if n_months else 0
     best_month  = max(monthly.items(), key=lambda x: x[1]["pnl_usd"]) if monthly else None
     worst_month = min(monthly.items(), key=lambda x: x[1]["pnl_usd"]) if monthly else None
 
     lines = []
-    lines.append("="*65)
+    lines.append("=" * 65)
     lines.append("BOLLINGER BACKTEST — COMPOUNDING PORTFOLIO WITH FEES")
-    lines.append("="*65)
+    lines.append("=" * 65)
     lines.append(f"Period:           {completed[0]['entry_dt'][:7]} → {completed[-1]['exit_dt'][:7]} ({years:.1f} years)")
     lines.append(f"Starting capital: ${STARTING_CAPITAL:,.2f}")
     lines.append(f"Final portfolio:  ${final_portfolio:,.2f}")
@@ -377,47 +427,46 @@ def run():
     lines.append(f"Net P&L:          ${total_pnl_usd:+,.2f}")
     lines.append(f"Avg per trade:    ${total_pnl_usd/total:+.2f}" if total else "")
     lines.append("")
-
-    # Per symbol
     lines.append("PER SYMBOL:")
     for sym in SYMBOLS:
-        st = [t for t in completed if t["symbol"]==sym]
+        st = [t for t in completed if t["symbol"] == sym]
         if not st: continue
-        sw   = sum(1 for t in st if t["result"]=="tp")
+        sw   = sum(1 for t in st if t["result"] == "tp")
         spnl = sum(t["pnl_usd"] for t in st)
         lines.append(f"  {sym:<10} {len(st):>4} trades  WR={sw/len(st)*100:>5.1f}%  Net=${spnl:>+8.2f}")
-
     lines.append("")
-    lines.append(f"MONTHLY BREAKDOWN ({len(monthly)} months):")
-    lines.append(f"  Profitable months: {profitable_months}/{len(monthly)} ({profitable_months/len(monthly)*100:.0f}%)")
+    lines.append(f"MONTHLY BREAKDOWN ({n_months} months):")
+    lines.append(f"  Profitable months: {profitable_months}/{n_months} ({profitable_months/n_months*100:.0f}%)")
     lines.append(f"  Avg monthly P&L:   ${avg_monthly_pnl:+.2f}")
     if best_month:
         lines.append(f"  Best month:        {best_month[0]}  ${best_month[1]['pnl_usd']:+.2f}")
     if worst_month:
         lines.append(f"  Worst month:       {worst_month[0]}  ${worst_month[1]['pnl_usd']:+.2f}")
     lines.append("")
-    lines.append(f"  {'Month':<8} {'Trades':>6} {'WR':>6} {'P&L':>10} {'Portfolio':>12}")
+    lines.append(f"  {'Month':<8} {'Trades':>6} {'WR':>6} {'P&L ($)':>10} {'Portfolio':>12}")
     lines.append(f"  {'-'*8} {'-'*6} {'-'*6} {'-'*10} {'-'*12}")
     for m in sorted(monthly.keys()):
         d = monthly[m]
         wr = d["wins"]/d["trades"]*100 if d["trades"] else 0
-        lines.append(f"  {m:<8} {d['trades']:>6} {wr:>5.0f}% {d['pnl_usd']:>+10.2f} {d['end_portfolio']:>12.2f}")
-
+        lines.append(f"  {m:<8} {d['trades']:>6} {wr:>5.0f}%  {d['pnl_usd']:>+9.2f}  {d['end_portfolio']:>11.2f}")
     lines.append("")
     lines.append("NOTES:")
-    lines.append("  - Each trade uses 25% of portfolio value at entry time")
+    lines.append("  - Each trade uses 25% of total portfolio (free + locked at cost)")
+    lines.append("  - Capped at available free cash if less than 25% total available")
     lines.append("  - Fees: 0.1% entry + 0.1% exit per trade")
-    lines.append("  - Entry at 30m candle close, TP/SL checked intrabar")
-    lines.append("  - consec_sl >= 1 blocks re-entry on same symbol")
-    lines.append("  - Max hold: 48 candles (24 hours)")
+    lines.append("  - Entry at 30m candle close, TP/SL checked intrabar on H/L")
+    lines.append("  - consec_sl >= 1 blocks re-entry within 6hrs on same symbol")
+    lines.append("  - Max hold: 48 candles (24 hours), exits at close")
+    lines.append("  - Max drawdown based on closed-trade portfolio values")
 
     report = "\n".join(lines)
     print("\n" + report)
 
     report_path = os.path.join(RESULTS_DIR, "bollinger_report.txt")
-    with open(report_path, "w") as f: f.write(report+"\n")
+    with open(report_path, "w") as f: f.write(report + "\n")
     print(f"\nTrades saved → {trades_csv}")
     print(f"Report saved → {report_path}")
+
 
 if __name__ == "__main__":
     run()
