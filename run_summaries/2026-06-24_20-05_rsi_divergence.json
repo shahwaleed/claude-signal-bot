@@ -1,0 +1,33 @@
+{
+  "run_at_dubai": "2026-06-25 00:05:19",
+  "strategy": "rsi_divergence",
+  "symbols": {
+    "BTCUSDT": {
+      "signal": "HOLD",
+      "confidence": 50,
+      "fired": false,
+      "invalid": false
+    },
+    "ETHUSDT": {
+      "signal": "HOLD",
+      "confidence": 50,
+      "fired": false,
+      "invalid": false
+    },
+    "SOLUSDT": {
+      "signal": "HOLD",
+      "confidence": 50,
+      "fired": false,
+      "invalid": false
+    },
+    "XRPUSDT": {
+      "signal": "HOLD",
+      "confidence": 50,
+      "fired": false,
+      "invalid": false
+    }
+  },
+  "signals_fired": 0,
+  "errors": [],
+  "invalids": []
+}
