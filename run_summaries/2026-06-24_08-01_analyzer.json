@@ -1,0 +1,64 @@
+{
+  "run_at_dubai": "2026-06-24 12:01:09",
+  "strategy_chosen": "bollinger",
+  "secondary_strategy": "ema_basic",
+  "confidence": 82,
+  "market_condition": "Oversold market with 2 assets in recovering mode, bearish trends across all timeframes, avg RSI_4h at 32.9",
+  "reasoning": "Rule 5 fired: recovering_mode=True on 2 assets (ETH, SOL), plus XRP 30m RSI touching 25 and BTC 1d RSI=28.67 signal deep oversold conditions suited for mean reversion.",
+  "key_signals": [
+    "ETH recovering_mode=True, RSI_4h=34.17, 1d RSI=20.08 deeply oversold",
+    "SOL recovering_mode=True, RSI_4h=26.46 near crash territory",
+    "XRP 30m RSI=25.0 at override threshold, avg RSI_4h=32.9 well below 35"
+  ],
+  "error": null,
+  "assets": {
+    "BTC": {
+      "rsi_4h": 36.15,
+      "rsi_30m": 44.99,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.1616
+    },
+    "ETH": {
+      "rsi_4h": 34.17,
+      "rsi_30m": 55.9,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": true,
+      "atr_pct_4h": 1.4818
+    },
+    "SOL": {
+      "rsi_4h": 26.46,
+      "rsi_30m": 46.81,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": true,
+      "atr_pct_4h": 1.749
+    },
+    "XRP": {
+      "rsi_4h": 34.62,
+      "rsi_30m": 25.0,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.4545
+    }
+  }
+}
