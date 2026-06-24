@@ -4,11 +4,10 @@ Backtests strategy_bollinger.py signal logic on historical 30m + 4h candles.
 No Claude API calls — pure rule-based signal replication.
 
 Key things being tested:
-  1. Overall P&L and win rate across 4 symbols (2024-2026)
-  2. Falling-knife detection: how often does bollinger re-enter immediately
-     after a stop-loss during a sustained downtrend?
-  3. Per-regime performance: crash / recovering / ranging / overbought
-  4. Does the RSI<25 override help or hurt overall?
+  1. Overall P&L and win rate across 4 symbols (2017-2026)
+  2. Compounding portfolio — each trade uses 25% of current portfolio value
+  3. Fees — 0.1% entry + 0.1% exit per trade
+  4. Monthly P&L breakdown — net dollar return per month
 
 Usage:
     python3 backtest_bollinger.py
@@ -26,15 +25,18 @@ DATA_DIR    = "data"
 RESULTS_DIR = "results"
 SYMBOLS     = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
 
-# Strategy parameters (must match live config)
-STOP_LOSS      = 3.0   # %
-MIN_CONFIDENCE = 65
-TP_MIN, TP_MAX = 0.5, 5.0
-MAX_HOLD_CANDLES = 48  # 24 hours max hold
+STARTING_CAPITAL = 1000.0
+ALLOCATION       = 0.25      # 25% of portfolio per bot
+FEE_RATE         = 0.001     # 0.1% per side
 
-MIN_TS = 1_000_000_000_000
-MAX_TS = 2_000_000_000_000
+STOP_LOSS        = 3.0
+TP_MIN, TP_MAX   = 0.5, 5.0
+MAX_HOLD_CANDLES = 48
+
+MIN_TS       = 1_000_000_000_000
+MAX_TS       = 2_000_000_000_000
 US_THRESHOLD = 1_000_000_000_000_000
+
 
 # ── Indicators ────────────────────────────────────────────────
 
@@ -68,222 +70,114 @@ def clamp_tp(v):
     if v is None: return TP_MIN
     return round(max(TP_MIN,min(TP_MAX,float(v))),2)
 
-# ── Signal generator (mirrors SYSTEM_PROMPT rules exactly) ───
+
+# ── Signal generator ──────────────────────────────────────────
 
 def get_signal(closes, trend_4h="unknown", consec_sl=0, symbol="", daily_trend="unknown", change_24h=0.0):
-    """
-    Bollinger signal v9 — pair+direction optimised from 2-year backtest data.
-
-    Profitable combinations (from backtest analysis):
-      ETHUSDT  BUY:  +0.993% avg  → keep, all conditions
-      ETHUSDT  SELL: +0.127% avg  → keep
-      XRPUSDT  BUY:  +0.229% avg  → keep
-      BTCUSDT  BUY:  +0.020% avg  → keep (marginal but positive)
-      BTCUSDT  SELL: -0.001% avg  → DROP (near zero, not worth the noise)
-      SOLUSDT  BUY:  -0.218% avg  → DROP
-      SOLUSDT  SELL: -0.080% avg  → DROP
-      XRPUSDT  SELL: -0.667% avg  → DROP (worst signal in dataset)
-
-    Additional filters:
-      - Circuit breaker at >=5 consecutive SLs
-      - Daily regime filter: BUY blocked when 1d trend bearish
-      - 4h trend filter: BUY blocked when 4h trend bearish
-      - pb < 0.5 filter: BUY blocked if price above middle band in bull trend
-      - Minimum TP 1.5% (1:2 risk:reward vs 3% SL)
-    """
     rsi = calc_rsi(closes, 14)
     _, middle, _, _, pb = calc_bb(closes, 20, 2.0)
     price = closes[-1]
     if pb is None: pb = 0.5
 
-    # Block ALL re-entries (consec>=1) — 8yr data shows they lose (-0.308% avg)
-    # Capitulation re-entry edge only existed in 2024-2026, not across full history
-    # Base entries (consec=0) are the edge: +0.463% avg over 8 years
     if consec_sl >= 1:
         return None, 0, 0, "reentry_blocked"
-
-    # Daily regime filter — BUY blocked when 1d trend bearish
     if daily_trend == "bearish":
         return None, 0, 0, "daily_trend_bearish"
-
-    # VOLATILITY CIRCUIT BREAKER — block during black swan events
     if change_24h <= -8.0:
         return None, 0, 0, "volatility_crash_blocked"
 
-    # RSI thresholds
-    rsi_buy_threshold  = 15 if symbol == "XRPUSDT" else 20
-    rsi_sell_threshold = 80
+    rsi_buy_threshold = 15 if symbol == "XRPUSDT" else 20
 
-    # SELL blocked for all pairs — loses across all 4 pairs over 8 years
-    if rsi > rsi_sell_threshold:
+    if rsi > 80:
         return None, 0, 0, "sell_blocked_all_pairs"
 
-    # Base entry selectivity — RSI must be below buy threshold
-    if consec_sl == 0:
-        base_buy_thresh = 15 if symbol == "XRPUSDT" else 20
-        if rsi >= base_buy_thresh:
-            return None, 0, 0, "base_entry_rsi_not_extreme"
+    if rsi >= rsi_buy_threshold:
+        return None, 0, 0, "base_entry_rsi_not_extreme"
 
-    # Determine signal
-    if rsi < rsi_buy_threshold:
-        if trend_4h == "bearish":
-            return None, 0, 0, "rsi_override_blocked_bearish"
-        if trend_4h == "bullish" and pb >= 0.5:
-            return None, 0, 0, "rsi_override_blocked_above_mid"
-        signal = "BUY"
-        conf = 95 if rsi < 10 else 90 if rsi < 15 else 80
-    elif rsi > rsi_sell_threshold:
-        # Already blocked above — this branch never reached
-        return None, 0, 0, "sell_blocked_all_pairs"
-    else:
-        return None, 0, 0, "no_signal"
+    if trend_4h == "bearish":
+        return None, 0, 0, "rsi_override_blocked_bearish"
+    if trend_4h == "bullish" and pb >= 0.5:
+        return None, 0, 0, "rsi_override_blocked_above_mid"
 
-    # v17: no pair+direction blocks — testing all combos on full 8-year data
+    signal = "BUY"
+    conf = 95 if rsi < 10 else 90 if rsi < 15 else 80
 
-    # Dynamic TP = distance to middle band
     if middle and price > 0:
         tp = round(abs(price - middle) / price * 100, 2)
         tp = clamp_tp(tp)
     else:
         tp = 1.5
 
-    # Minimum TP — XRP requires 2.5% (data: TP<2.5% avg -0.591%), others 1.5%
     min_tp = 2.5 if symbol == "XRPUSDT" else 1.5
     if tp < min_tp:
         return None, 0, 0, "tp_too_small"
 
     return signal, conf, tp, "ok"
 
+
 # ── Trade simulator ───────────────────────────────────────────
 
 def simulate_trade(direction, entry, tp_pct, future_candles):
-    """Simulate entry at close, check each future candle for TP/SL."""
-    if direction=="BUY":
-        tp_price=entry*(1+tp_pct/100)
-        sl_price=entry*(1-STOP_LOSS/100)
+    if direction == "BUY":
+        tp_price = entry*(1+tp_pct/100)
+        sl_price = entry*(1-STOP_LOSS/100)
     else:
-        tp_price=entry*(1-tp_pct/100)
-        sl_price=entry*(1+STOP_LOSS/100)
+        tp_price = entry*(1-tp_pct/100)
+        sl_price = entry*(1+STOP_LOSS/100)
 
-    for i,c in enumerate(future_candles[:MAX_HOLD_CANDLES]):
-        high,low=c[2],c[3]
-        if direction=="BUY":
-            if low<=sl_price:  return "sl",  sl_price,  i+1
-            if high>=tp_price: return "tp",  tp_price,  i+1
+    for i, c in enumerate(future_candles[:MAX_HOLD_CANDLES]):
+        hi, lo = c[2], c[3]
+        if direction == "BUY":
+            if lo <= sl_price:  return "sl",      sl_price,  i+1
+            if hi >= tp_price:  return "tp",      tp_price,  i+1
         else:
-            if high>=sl_price: return "sl",  sl_price,  i+1
-            if low<=tp_price:  return "tp",  tp_price,  i+1
+            if hi >= sl_price:  return "sl",      sl_price,  i+1
+            if lo <= tp_price:  return "tp",      tp_price,  i+1
 
-    exit_price=future_candles[min(MAX_HOLD_CANDLES-1,len(future_candles)-1)][4] if future_candles else entry
+    exit_price = future_candles[min(MAX_HOLD_CANDLES-1,len(future_candles)-1)][4] if future_candles else entry
     return "timeout", exit_price, min(MAX_HOLD_CANDLES, len(future_candles))
+
 
 # ── Data loader ───────────────────────────────────────────────
 
 def load_csv(path):
-    rows=[]
+    rows = []
     with open(path) as f:
         for row in csv.DictReader(f):
             try:
-                ts=int(row["open_time_ms"])
-                if ts>US_THRESHOLD: ts=ts//1000
-                if not (MIN_TS<=ts<=MAX_TS): continue
-                rows.append([ts,float(row["open"]),float(row["high"]),
-                             float(row["low"]),float(row["close"]),float(row["volume"])])
+                ts = int(row["open_time_ms"])
+                if ts > US_THRESHOLD: ts = ts // 1000
+                if not (MIN_TS <= ts <= MAX_TS): continue
+                rows.append([ts, float(row["open"]), float(row["high"]),
+                             float(row["low"]), float(row["close"]), float(row["volume"])])
             except: continue
     return rows
 
-# ── Falling knife detector ────────────────────────────────────
 
-def is_falling_knife(trades, symbol, entry_ts, lookback_hours=6):
-    """
-    Check if this entry follows a recent SL on the same symbol.
-    Returns True if there was a stop-loss within lookback_hours before this entry.
-    """
-    lookback_ms = lookback_hours * 60 * 60 * 1000
-    for t in reversed(trades):
-        if t["symbol"] != symbol: continue
-        if t["exit_ts"] > entry_ts: continue
-        if entry_ts - t["exit_ts"] > lookback_ms: break
-        if t["result"] == "sl":
-            return True
-    return False
+# ── Trend helpers ─────────────────────────────────────────────
 
-def count_consecutive_sl(trades, symbol, entry_ts, window_hours=24):
-    """Count consecutive SLs on same symbol before this entry."""
+def count_consecutive_sl(trades, symbol, entry_ts, window_hours=6):
     window_ms = window_hours * 60 * 60 * 1000
     count = 0
     for t in reversed(trades):
         if t["symbol"] != symbol: continue
         if t["exit_ts"] > entry_ts: continue
         if entry_ts - t["exit_ts"] > window_ms: break
-        if t["result"] == "sl":
-            count += 1
-        else:
-            break  # stop counting at first non-SL
+        if t["result"] == "sl": count += 1
+        else: break
     return count
 
-# ── Trend context ─────────────────────────────────────────────
-
 def get_trend_context(candles_4h, ts_ms):
-    """Get 4h EMA trend at time of signal."""
     hist = [c for c in candles_4h if c[0] <= ts_ms][-50:]
     if len(hist) < 22: return "unknown"
     closes = [c[4] for c in hist]
-    e9 = calc_ema(closes, 9); e21 = calc_ema(closes, 21)
-    return "bullish" if e9 > e21 else "bearish"
-
-# ── Analyzer mode detector ───────────────────────────────────
-
-def get_analyzer_mode(all_4h, ts_ms):
-    """
-    Compute what mode the market analyzer would have selected at ts_ms.
-    Returns: "bollinger", "rsi_divergence", "trend", or "ema_basic"
-    """
-    asset_modes = {}
-    for sym, candles_4h in all_4h.items():
-        hist = [c for c in candles_4h if c[0] <= ts_ms][-50:]
-        if len(hist) < 30: continue
-        closes = [c[4] for c in hist]
-        rsi_4h = calc_rsi(closes, 14)
-        # 30m RSI: use 4h as proxy (we don't have per-symbol 30m here)
-        rsi_30m = calc_rsi(closes[-12:], 14)  # last 12 4h = ~2 days
-        div = False  # simplified — divergence detection is complex
-        crash = rsi_4h < 25 and not div
-        overbought = rsi_4h > 75 and not div
-        recovering = (not crash) and rsi_4h < 35 and rsi_30m > 40 and not div
-        asset_modes[sym] = {
-            "rsi_4h": rsi_4h, "crash": crash,
-            "overbought": overbought, "recovering": recovering,
-        }
-
-    if len(asset_modes) < 3: return "unknown"
-
-    n_crash  = sum(1 for d in asset_modes.values() if d["crash"])
-    n_over   = sum(1 for d in asset_modes.values() if d["overbought"])
-    n_rec    = sum(1 for d in asset_modes.values() if d["recovering"])
-    avg_rsi  = sum(d["rsi_4h"] for d in asset_modes.values()) / len(asset_modes)
-
-    if n_crash >= 2:   return "bollinger"   # rule 3
-    if n_over  >= 2:   return "bollinger"   # rule 4
-    if n_rec   >= 2:   return "bollinger"   # rule 5
-    if 35 <= avg_rsi <= 65: return "bollinger"  # rule 8 (ranging)
-    return "other"  # trend/divergence/ema_basic
-
-
-# ── Daily trend context ──────────────────────────────────────
+    return "bullish" if calc_ema(closes, 9) > calc_ema(closes, 21) else "bearish"
 
 def get_daily_trend(candles_1d, ts_ms):
-    """
-    Get 1d EMA trend at time of signal.
-    Returns "bullish" if EMA9 > EMA21 on daily, "bearish" otherwise.
-    Regime filter — only fire RSI override in bullish daily regime.
-    In sustained bear markets (2018, 2022) RSI<25 = trend continuation not reversal.
-    """
     hist = [c for c in candles_1d if c[0] <= ts_ms][-30:]
     if len(hist) < 22: return "unknown"
     closes = [c[4] for c in hist]
-    e9 = calc_ema(closes, 9); e21 = calc_ema(closes, 21)
-    return "bullish" if e9 > e21 else "bearish"
+    return "bullish" if calc_ema(closes, 9) > calc_ema(closes, 21) else "bearish"
 
 
 # ── Main backtest ─────────────────────────────────────────────
@@ -291,8 +185,7 @@ def get_daily_trend(candles_1d, ts_ms):
 def run():
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
-    # Load data — full history 2017-2026 (8 year backtest)
-    START_MS = 1502150400000  # 2017-08-08 (Binance launch)
+    START_MS = 1502150400000  # 2017-08-08
     END_MS   = 1746057600000  # 2026-04-30
 
     print("Loading data...")
@@ -302,156 +195,229 @@ def run():
         path_4h  = os.path.join(DATA_DIR, f"{sym}_4h.csv")
         path_1d  = os.path.join(DATA_DIR, f"{sym}_1d.csv")
         if not os.path.exists(path_30m):
-            print(f"  ⚠️  Missing {path_30m}"); return
+            print(f"  Missing {path_30m}"); return
         c30m = [c for c in load_csv(path_30m) if START_MS <= c[0] <= END_MS]
-        c4h  = [c for c in load_csv(path_4h)]
+        c4h  = load_csv(path_4h)
         c1d  = load_csv(path_1d) if os.path.exists(path_1d) else []
         data[sym] = {"30m": c30m, "4h": c4h, "1d": c1d}
-        print(f"  {sym}: {len(c30m)} 30m candles, {len(c4h)} 4h candles, {len(c1d)} 1d candles")
+        print(f"  {sym}: {len(c30m)} 30m  {len(c4h)} 4h  {len(c1d)} 1d")
 
-    # Load all 4 symbols' 4h data for analyzer mode detection
-    all_4h = {sym: data[sym]["4h"] for sym in SYMBOLS}
+    raw_trades = []
+    LOOKBACK = 50
 
-    all_trades = []
-    LOOKBACK = 50  # candles for indicator calculation
-
-    # All 4 symbols — full reversal mode (BUY=long, SELL=short)
-    BOLLINGER_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
-
-    print("\nSimulating trades...")
-    for sym in BOLLINGER_SYMBOLS:
+    print("\nSimulating signals...")
+    for sym in SYMBOLS:
         candles_30m = data[sym]["30m"]
         candles_4h  = data[sym]["4h"]
         n = 0
-
         for i in range(LOOKBACK, len(candles_30m)-1):
-            candle   = candles_30m[i]
-            ts_ms    = candle[0]
-            closes   = [c[4] for c in candles_30m[i-LOOKBACK:i+1]]
-            entry    = candle[4]  # enter at close of signal candle
-
-            # FIX 1+3: pass trend context, daily regime, and consecutive SL count
-            trend_ctx   = get_trend_context(candles_4h, ts_ms)
-            daily_trend = get_daily_trend(data[sym]["1d"], ts_ms)
-            consec      = count_consecutive_sl(all_trades, sym, ts_ms, window_hours=6)
-            # 24hr price change — 48 candles of 30m = 24 hours
-            change_24h  = (closes[-1] - closes[-48]) / closes[-48] * 100 if len(closes) >= 48 else 0.0
-            sig, conf, tp, skip_reason = get_signal(closes, trend_ctx, consec, sym, daily_trend, change_24h)
+            candle    = candles_30m[i]
+            ts_ms     = candle[0]
+            closes    = [c[4] for c in candles_30m[i-LOOKBACK:i+1]]
+            entry     = candle[4]
+            trend_4h  = get_trend_context(candles_4h, ts_ms)
+            daily     = get_daily_trend(data[sym]["1d"], ts_ms)
+            consec    = count_consecutive_sl(raw_trades, sym, ts_ms)
+            ch24      = (closes[-1]-closes[-48])/closes[-48]*100 if len(closes)>=48 else 0.0
+            sig, conf, tp, skip = get_signal(closes, trend_4h, consec, sym, daily, ch24)
             if sig is None: continue
 
-            # Determine what the market analyzer would have selected
-            analyzer_mode = get_analyzer_mode(all_4h, ts_ms)
-
             future = candles_30m[i+1:]
-            result, exit_price, candles_held = simulate_trade(sig, entry, tp, future)
+            result, exit_price, held = simulate_trade(sig, entry, tp, future)
+            exit_ts = future[held-1][0] if held <= len(future) else ts_ms
+            pnl_pct = (exit_price-entry)/entry*100 if sig=="BUY" else (entry-exit_price)/entry*100
 
-            exit_ts = future[candles_held-1][0] if candles_held <= len(future) else ts_ms
-            pnl = (exit_price-entry)/entry*100 if sig=="BUY" else (entry-exit_price)/entry*100
-
-            # Context
-            trend_4h    = get_trend_context(candles_4h, ts_ms)
-            fell_knife  = is_falling_knife(all_trades, sym, ts_ms, lookback_hours=6)
-            consec_sl   = count_consecutive_sl(all_trades, sym, ts_ms, window_hours=24)
-            rsi_at_sig  = calc_rsi(closes, 14)
-            override    = rsi_at_sig < 25 or rsi_at_sig > 75
-
-            dt = datetime.fromtimestamp(ts_ms/1000, tz=timezone.utc)
-            all_trades.append({
-                "datetime_utc":   dt.strftime("%Y-%m-%d %H:%M"),
-                "symbol":         sym,
-                "direction":      sig,
-                "confidence":     conf,
-                "entry_price":    round(entry, 4),
-                "exit_price":     round(exit_price, 4),
-                "tp_pct":         tp,
-                "sl_pct":         STOP_LOSS,
-                "result":         result,
-                "pnl_pct":        round(pnl, 4),
-                "candles_held":   candles_held,
-                "rsi_at_signal":  rsi_at_sig,
-                "trend_4h":       trend_4h,
-                "rsi_override":   override,
-                "falling_knife":  fell_knife,
-                "consec_sl_before": consec_sl,
-                "entry_ts":       ts_ms,
-                "exit_ts":        exit_ts,
-                "analyzer_mode":  analyzer_mode,
-                "skip_reason":    skip_reason,
-                "daily_trend":    daily_trend,
+            raw_trades.append({
+                "symbol": sym, "direction": sig,
+                "entry": entry, "exit_price": exit_price,
+                "tp_pct": tp, "result": result,
+                "pnl_pct": round(pnl_pct, 4),
+                "entry_ts": ts_ms, "exit_ts": exit_ts,
             })
             n += 1
+        print(f"  {sym}: {n} trades")
 
-        print(f"  {sym}: {n} signals generated")
+    # ── COMPOUNDING PORTFOLIO SIMULATION ──────────────────────
+    # Sort all trades by ENTRY time to simulate concurrent positions correctly.
+    # At entry: deduct fee on allocated size.
+    # At exit:  apply P&L and deduct exit fee.
+    # Portfolio value is the running cash balance (unrealized P&L not tracked
+    # between entry and exit — size is locked at entry-time portfolio value).
 
-    # Save trades CSV
+    print("\nSimulating compounding portfolio...")
+    raw_trades.sort(key=lambda t: t["entry_ts"])
+
+    portfolio = STARTING_CAPITAL
+    open_positions = {}   # sym -> {size_usd, entry_ts, ...}
+    completed = []        # final trades with dollar P&L
+
+    # We need to process events in time order (both entries and exits)
+    events = []
+    for i, t in enumerate(raw_trades):
+        events.append(("entry", t["entry_ts"], i, t))
+        events.append(("exit",  t["exit_ts"],  i, t))
+    events.sort(key=lambda e: (e[1], 0 if e[0]=="entry" else 1))
+
+    for ev_type, ev_ts, idx, t in events:
+        if ev_type == "entry":
+            # Don't re-enter if already in a position for this symbol
+            if t["symbol"] in open_positions:
+                continue
+            size_usd = portfolio * ALLOCATION
+            entry_fee = size_usd * FEE_RATE
+            portfolio -= entry_fee
+            open_positions[t["symbol"]] = {
+                "idx": idx, "size_usd": size_usd,
+                "entry_ts": t["entry_ts"], "entry": t["entry"],
+                "tp_pct": t["tp_pct"], "result": t["result"],
+                "pnl_pct": t["pnl_pct"], "exit_ts": t["exit_ts"],
+                "exit_price": t["exit_price"],
+            }
+        else:  # exit
+            pos = open_positions.get(t["symbol"])
+            if pos is None: continue
+            # Make sure this exit matches the open position
+            if pos["entry_ts"] != t["entry_ts"]: continue
+
+            pnl_usd  = pos["size_usd"] * pos["pnl_pct"] / 100
+            exit_fee = pos["size_usd"] * FEE_RATE
+            net_usd  = pnl_usd - exit_fee
+            portfolio += pos["size_usd"] + net_usd  # return capital + net profit
+
+            dt_entry = datetime.fromtimestamp(pos["entry_ts"]/1000, tz=timezone.utc)
+            dt_exit  = datetime.fromtimestamp(pos["exit_ts"]/1000,  tz=timezone.utc)
+            completed.append({
+                "symbol":        t["symbol"],
+                "direction":     t["direction"],
+                "entry_dt":      dt_entry.strftime("%Y-%m-%d %H:%M"),
+                "exit_dt":       dt_exit.strftime("%Y-%m-%d %H:%M"),
+                "entry_price":   round(pos["entry"], 4),
+                "exit_price":    round(pos["exit_price"], 4),
+                "tp_pct":        pos["tp_pct"],
+                "result":        pos["result"],
+                "pnl_pct":       pos["pnl_pct"],
+                "size_usd":      round(pos["size_usd"], 4),
+                "pnl_usd":       round(net_usd, 4),
+                "portfolio_after": round(portfolio, 2),
+                "exit_month":    dt_exit.strftime("%Y-%m"),
+            })
+            del open_positions[t["symbol"]]
+
+    # Save detailed trades CSV
     trades_csv = os.path.join(RESULTS_DIR, "bollinger_trades.csv")
-    if all_trades:
+    if completed:
         with open(trades_csv, "w", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=list(all_trades[0].keys()))
-            w.writeheader(); w.writerows(all_trades)
-        print(f"\nSaved {len(all_trades)} trades → {trades_csv}")
+            w = csv.DictWriter(f, fieldnames=list(completed[0].keys()))
+            w.writeheader(); w.writerows(completed)
 
-    # ── Analysis ──────────────────────────────────────────────
-    total  = len(all_trades)
-    if total == 0:
-        print("\n⚠️  No trades generated — filters too restrictive for this dataset")
-        return
-    wins   = sum(1 for t in all_trades if t["result"]=="tp")
-    losses = sum(1 for t in all_trades if t["result"]=="sl")
-    timeouts = sum(1 for t in all_trades if t["result"]=="timeout")
-    total_pnl   = sum(t["pnl_pct"] for t in all_trades)
-    avg_pnl     = total_pnl/total if total else 0
-    win_rate    = wins/total*100 if total else 0
+    # ── MONTHLY BREAKDOWN ──────────────────────────────────────
+    monthly = defaultdict(lambda: {"trades": 0, "wins": 0, "pnl_usd": 0.0, "start_portfolio": None, "end_portfolio": 0.0})
+    for t in completed:
+        m = t["exit_month"]
+        monthly[m]["trades"] += 1
+        if t["result"] == "tp": monthly[m]["wins"] += 1
+        monthly[m]["pnl_usd"] += t["pnl_usd"]
+        monthly[m]["end_portfolio"] = t["portfolio_after"]
+
+    # Fill start portfolio for each month
+    prev_end = STARTING_CAPITAL
+    for m in sorted(monthly.keys()):
+        monthly[m]["start_portfolio"] = prev_end
+        prev_end = monthly[m]["end_portfolio"]
+
+    # ── REPORT ────────────────────────────────────────────────
+    total     = len(completed)
+    wins      = sum(1 for t in completed if t["result"]=="tp")
+    losses    = sum(1 for t in completed if t["result"]=="sl")
+    timeouts  = sum(1 for t in completed if t["result"]=="timeout")
+    win_rate  = wins/total*100 if total else 0
+    total_pnl_usd  = sum(t["pnl_usd"] for t in completed)
+    total_fees = sum(t["size_usd"]*FEE_RATE*2 for t in completed)
+    final_portfolio = portfolio
+    total_return = (final_portfolio - STARTING_CAPITAL) / STARTING_CAPITAL * 100
+
+    # CAGR
+    if completed:
+        first_dt = datetime.strptime(completed[0]["entry_dt"],  "%Y-%m-%d %H:%M")
+        last_dt  = datetime.strptime(completed[-1]["exit_dt"],  "%Y-%m-%d %H:%M")
+        years    = (last_dt - first_dt).days / 365.25
+        cagr     = ((final_portfolio/STARTING_CAPITAL)**(1/years)-1)*100 if years>0 else 0
+    else:
+        years = 0; cagr = 0
+
+    # Max drawdown
+    peak = STARTING_CAPITAL; mdd = 0.0
+    running = STARTING_CAPITAL
+    for t in completed:
+        running = t["portfolio_after"]
+        if running > peak: peak = running
+        dd = (peak - running) / peak * 100
+        if dd > mdd: mdd = dd
+
+    # Monthly stats
+    profitable_months = sum(1 for d in monthly.values() if d["pnl_usd"] > 0)
+    avg_monthly_pnl   = sum(d["pnl_usd"] for d in monthly.values()) / len(monthly) if monthly else 0
+    best_month  = max(monthly.items(), key=lambda x: x[1]["pnl_usd"]) if monthly else None
+    worst_month = min(monthly.items(), key=lambda x: x[1]["pnl_usd"]) if monthly else None
 
     lines = []
     lines.append("="*65)
-    lines.append("BOLLINGER BACKTEST REPORT v18 (all pairs BUY only) — full history")
+    lines.append("BOLLINGER BACKTEST — COMPOUNDING PORTFOLIO WITH FEES")
     lines.append("="*65)
-    lines.append(f"Total trades:  {total}")
-    lines.append(f"Win rate:      {win_rate:.1f}% ({wins} TP / {losses} SL / {timeouts} timeout)")
-    lines.append(f"Avg P&L/trade: {avg_pnl:+.3f}%")
-    lines.append(f"Total P&L:     {total_pnl:+.2f}%")
+    lines.append(f"Period:           {completed[0]['entry_dt'][:7]} → {completed[-1]['exit_dt'][:7]} ({years:.1f} years)")
+    lines.append(f"Starting capital: ${STARTING_CAPITAL:,.2f}")
+    lines.append(f"Final portfolio:  ${final_portfolio:,.2f}")
+    lines.append(f"Total return:     {total_return:+.1f}%")
+    lines.append(f"CAGR:             {cagr:+.1f}%/year")
+    lines.append(f"Max drawdown:     -{mdd:.1f}%")
+    lines.append(f"Total fees paid:  ${total_fees:,.2f}")
+    lines.append("")
+    lines.append(f"Total trades:     {total}")
+    lines.append(f"Win rate:         {win_rate:.1f}%  ({wins} TP / {losses} SL / {timeouts} timeout)")
+    lines.append(f"Net P&L:          ${total_pnl_usd:+,.2f}")
+    lines.append(f"Avg per trade:    ${total_pnl_usd/total:+.2f}" if total else "")
     lines.append("")
 
     # Per symbol
     lines.append("PER SYMBOL:")
     for sym in SYMBOLS:
-        st = [t for t in all_trades if t["symbol"]==sym]
+        st = [t for t in completed if t["symbol"]==sym]
         if not st: continue
-        sw = sum(1 for t in st if t["result"]=="tp")
-        sp = sum(t["pnl_pct"] for t in st)
-        lines.append(f"  {sym:<10} {len(st):>4} trades  WR={sw/len(st)*100:>5.1f}%  P&L={sp:>+8.2f}%  avg={sp/len(st):>+6.3f}%")
+        sw   = sum(1 for t in st if t["result"]=="tp")
+        spnl = sum(t["pnl_usd"] for t in st)
+        lines.append(f"  {sym:<10} {len(st):>4} trades  WR={sw/len(st)*100:>5.1f}%  Net=${spnl:>+8.2f}")
 
-    # RSI override trades
-    ov = [t for t in all_trades if t["rsi_override"]]
-    ov_wins = sum(1 for t in ov if t["result"]=="tp")
-    ov_pnl  = sum(t["pnl_pct"] for t in ov)
     lines.append("")
-    lines.append(f"RSI OVERRIDE TRADES (RSI<25 or RSI>75): {len(ov)} trades")
-    if ov:
-        lines.append(f"  Win rate: {ov_wins/len(ov)*100:.1f}%  Total P&L: {ov_pnl:+.2f}%  Avg: {ov_pnl/len(ov):+.3f}%")
-
-    # Non-override trades
-    nov = [t for t in all_trades if not t["rsi_override"]]
-    nov_wins = sum(1 for t in nov if t["result"]=="tp")
-    nov_pnl  = sum(t["pnl_pct"] for t in nov)
-    lines.append(f"BAND-TOUCH TRADES (no override): {len(nov)} trades")
-    if nov:
-        lines.append(f"  Win rate: {nov_wins/len(nov)*100:.1f}%  Total P&L: {nov_pnl:+.2f}%  Avg: {nov_pnl/len(nov):+.3f}%")
+    lines.append(f"MONTHLY BREAKDOWN ({len(monthly)} months):")
+    lines.append(f"  Profitable months: {profitable_months}/{len(monthly)} ({profitable_months/len(monthly)*100:.0f}%)")
+    lines.append(f"  Avg monthly P&L:   ${avg_monthly_pnl:+.2f}")
+    if best_month:
+        lines.append(f"  Best month:        {best_month[0]}  ${best_month[1]['pnl_usd']:+.2f}")
+    if worst_month:
+        lines.append(f"  Worst month:       {worst_month[0]}  ${worst_month[1]['pnl_usd']:+.2f}")
+    lines.append("")
+    lines.append(f"  {'Month':<8} {'Trades':>6} {'WR':>6} {'P&L':>10} {'Portfolio':>12}")
+    lines.append(f"  {'-'*8} {'-'*6} {'-'*6} {'-'*10} {'-'*12}")
+    for m in sorted(monthly.keys()):
+        d = monthly[m]
+        wr = d["wins"]/d["trades"]*100 if d["trades"] else 0
+        lines.append(f"  {m:<8} {d['trades']:>6} {wr:>5.0f}% {d['pnl_usd']:>+10.2f} {d['end_portfolio']:>12.2f}")
 
     lines.append("")
     lines.append("NOTES:")
-    lines.append("  - Entry at 30m candle close, exit at first TP/SL candle touch")
-    lines.append("  - No fees included in P&L% figures")
-    lines.append("  - All 4 symbols traded simultaneously")
-    lines.append("  - Timeout = 24hr max hold, exits at last candle close")
-    lines.append("  - consec_sl >= 1 blocks re-entry (8yr data: re-entries lose -0.308% avg)")
+    lines.append("  - Each trade uses 25% of portfolio value at entry time")
+    lines.append("  - Fees: 0.1% entry + 0.1% exit per trade")
+    lines.append("  - Entry at 30m candle close, TP/SL checked intrabar")
+    lines.append("  - consec_sl >= 1 blocks re-entry on same symbol")
+    lines.append("  - Max hold: 48 candles (24 hours)")
 
     report = "\n".join(lines)
     print("\n" + report)
+
     report_path = os.path.join(RESULTS_DIR, "bollinger_report.txt")
     with open(report_path, "w") as f: f.write(report+"\n")
-    print(f"\nReport saved → {report_path}")
+    print(f"\nTrades saved → {trades_csv}")
+    print(f"Report saved → {report_path}")
 
 if __name__ == "__main__":
     run()
