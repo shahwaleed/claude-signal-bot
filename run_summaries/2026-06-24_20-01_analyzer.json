@@ -1,0 +1,64 @@
+{
+  "run_at_dubai": "2026-06-25 00:01:07",
+  "strategy_chosen": "rsi_divergence",
+  "secondary_strategy": "bollinger",
+  "confidence": 82,
+  "market_condition": "Extreme oversold conditions with bullish divergence across 3/4 assets and avg RSI_4h of 18.3",
+  "reasoning": "Rule 1 fires: bullish divergence confirmed on 3+ assets (BTC, ETH, XRP) AND avg RSI_4h=18.3 is well below 50, signaling a high-probability oversold reversal.",
+  "key_signals": [
+    "Bullish divergence on BTC (RSI_4h=20.08), ETH (RSI_4h=20.37), XRP (RSI_4h=18.94) \u2014 3/4 assets confirmed",
+    "Avg RSI_4h=18.3 \u2014 deeply oversold, far below the 50 threshold required for Rule 1",
+    "SOL in crash_mode with RSI_4h=13.74, reinforcing extreme oversold market-wide conditions"
+  ],
+  "error": null,
+  "assets": {
+    "BTC": {
+      "rsi_4h": 20.08,
+      "rsi_30m": 18.27,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": "bullish",
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.3191
+    },
+    "ETH": {
+      "rsi_4h": 20.37,
+      "rsi_30m": 19.99,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": "bullish",
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.5571
+    },
+    "SOL": {
+      "rsi_4h": 13.74,
+      "rsi_30m": 23.52,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": false,
+      "crash_mode": true,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 2.0066
+    },
+    "XRP": {
+      "rsi_4h": 18.94,
+      "rsi_30m": 28.92,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": "bullish",
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.4313
+    }
+  }
+}
