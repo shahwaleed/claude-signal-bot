@@ -1,13 +1,13 @@
 {
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
-  "confidence": 92,
-  "market_condition": "Crash mode with deeply oversold 4h RSI across multiple assets, short-term bounce visible on 30m",
-  "reasoning": "Rule 3 fired: crash_mode=True on 2+ assets (BTC RSI_4h=24.19, ETH RSI_4h=24.93), triggering bollinger for mean reversion plays",
+  "confidence": 78,
+  "market_condition": "Oversold market with low RSI across all assets, bearish trends, no divergence or special modes triggered",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, no bullish-aligned assets); Rule 8 fires as ranging/choppy with avg RSI 33.1 near oversold territory, making bollinger the correct default mean-reversion handler",
   "key_signals": [
-    "BTC and ETH in crash_mode with RSI_4h below 25",
-    "Avg RSI_4h=25.9 \u2014 deeply oversold across all 4 assets",
-    "30m timeframes showing bullish bounce (BTC 77, ETH 94, SOL 73) suggesting short-term relief rally"
+    "Avg RSI_4h=33.1 \u2014 deeply oversold, approaching crash territory but not triggering crash_mode",
+    "ETH 1d RSI=20.08 and BTC 1d RSI=28.67 suggest significant oversold pressure on daily timeframe",
+    "SOL 30m RSI=23.5 nearing override BUY threshold (<25); all assets showing short-term bearish alignment"
   ],
-  "updated_at_dubai": "2026-06-25 12:01:07"
+  "updated_at_dubai": "2026-06-25 18:01:11"
 }
