@@ -1,0 +1,64 @@
+{
+  "run_at_dubai": "2026-06-25 18:01:12",
+  "strategy_chosen": "bollinger",
+  "secondary_strategy": "ema_basic",
+  "confidence": 78,
+  "market_condition": "Oversold market with low RSI across all assets, bearish trends, no divergence or special modes triggered",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, no bullish-aligned assets); Rule 8 fires as ranging/choppy with avg RSI 33.1 near oversold territory, making bollinger the correct default mean-reversion handler",
+  "key_signals": [
+    "Avg RSI_4h=33.1 \u2014 deeply oversold, approaching crash territory but not triggering crash_mode",
+    "ETH 1d RSI=20.08 and BTC 1d RSI=28.67 suggest significant oversold pressure on daily timeframe",
+    "SOL 30m RSI=23.5 nearing override BUY threshold (<25); all assets showing short-term bearish alignment"
+  ],
+  "error": null,
+  "assets": {
+    "BTC": {
+      "rsi_4h": 32.9,
+      "rsi_30m": 33.23,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.5144
+    },
+    "ETH": {
+      "rsi_4h": 32.72,
+      "rsi_30m": 35.88,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.9442
+    },
+    "SOL": {
+      "rsi_4h": 36.41,
+      "rsi_30m": 23.5,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 2.1277
+    },
+    "XRP": {
+      "rsi_4h": 30.57,
+      "rsi_30m": 26.67,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.4099
+    }
+  }
+}
