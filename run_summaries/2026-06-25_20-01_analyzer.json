@@ -1,0 +1,66 @@
+{
+  "run_at_dubai": "2026-06-26 00:01:07",
+  "strategy_chosen": "rsi_divergence",
+  "secondary_strategy": "bollinger",
+  "confidence": 88,
+  "market_condition": "Oversold market with bullish divergence across all 4 assets, avg RSI_4h=31.3 well below 50",
+  "reasoning": "Rule 1 fires: bullish divergence confirmed on 4/4 assets AND avg RSI_4h=31.3 < 50, indicating a high-probability oversold reversal setup",
+  "key_signals": [
+    "Bullish divergence on all 4 assets (BTC, ETH, SOL, XRP)",
+    "Avg RSI_4h=31.3 deeply oversold, approaching crash territory",
+    "ETH 1d RSI=20.08 and XRP 4h RSI=27.59 at extreme lows signaling exhaustion",
+    "All assets down 5-9% on 7d with wide BB bands suggesting overextended move",
+    "ATR avg=2.03% confirms volatility available for reversal bounce"
+  ],
+  "error": null,
+  "assets": {
+    "BTC": {
+      "rsi_4h": 31.26,
+      "rsi_30m": 35.42,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": "bullish",
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.7585
+    },
+    "ETH": {
+      "rsi_4h": 30.8,
+      "rsi_30m": 32.61,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": "bullish",
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 2.2672
+    },
+    "SOL": {
+      "rsi_4h": 35.71,
+      "rsi_30m": 37.07,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": "bullish",
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 2.3828
+    },
+    "XRP": {
+      "rsi_4h": 27.59,
+      "rsi_30m": 29.17,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": "bullish",
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.7096
+    }
+  }
+}
