@@ -2,12 +2,12 @@
   "strategy": "bollinger",
   "secondary_strategy": "rsi_divergence",
   "confidence": 78,
-  "market_condition": "Mixed bearish trend with only 2/4 assets showing bullish divergence, avg RSI_4h at 36.6 in oversold-leaning territory",
-  "reasoning": "Rules 1-2 require 3+ assets with divergence but only 2/4 qualify; rules 3-5 require 2+ assets in crash/overbought/recovering mode but none qualify; rule 6-7 require 3+ bullish aligned assets but 0/4 qualify; falling to rule 8/9 with avg RSI 36.6 near lower bound of ranging zone, bollinger handles this oversold mean-reversion setup as default.",
+  "market_condition": "Broad market weakness with low RSI across assets, only 2/4 showing bullish divergence \u2014 insufficient for rsi_divergence trigger",
+  "reasoning": "Rules 1-2 fail (only 2 assets with bullish divergence, need 3+); Rules 3-5 fail (no crash/overbought/recovering modes); Rules 6-7 fail (0 assets bullish-aligned with RSI 40-70); Rule 8 fires as ranging/oversold market with avg RSI 36.2 near lower bounds \u2014 bollinger default applies",
   "key_signals": [
-    "Only 2/4 assets show bullish divergence (ETH, XRP) \u2014 insufficient for rsi_divergence rule",
-    "Avg RSI_4h=36.6 oversold-leaning, BTC 1d RSI=28.67 and ETH 1d RSI=20.08 near crash territory",
-    "No aligned bullish assets across timeframes, broad bearish pressure with high ATR suggesting volatility"
+    "Only 2/4 assets show bullish divergence (ETH, XRP) \u2014 below 3-asset threshold",
+    "Avg RSI_4h=36.2 \u2014 oversold territory, BTC 1d RSI=28.67 and ETH 1d RSI=20.08 approaching crash levels",
+    "All aligned assets (BTC, ETH, XRP) fully bearish across 30m/4h/1d timeframes \u2014 no bullish trend confirmation"
   ],
-  "updated_at_dubai": "2026-06-26 12:01:05"
+  "updated_at_dubai": "2026-06-26 18:01:10"
 }
