@@ -1,0 +1,64 @@
+{
+  "run_at_dubai": "2026-06-26 18:01:11",
+  "strategy_chosen": "bollinger",
+  "secondary_strategy": "rsi_divergence",
+  "confidence": 78,
+  "market_condition": "Broad market weakness with low RSI across assets, only 2/4 showing bullish divergence \u2014 insufficient for rsi_divergence trigger",
+  "reasoning": "Rules 1-2 fail (only 2 assets with bullish divergence, need 3+); Rules 3-5 fail (no crash/overbought/recovering modes); Rules 6-7 fail (0 assets bullish-aligned with RSI 40-70); Rule 8 fires as ranging/oversold market with avg RSI 36.2 near lower bounds \u2014 bollinger default applies",
+  "key_signals": [
+    "Only 2/4 assets show bullish divergence (ETH, XRP) \u2014 below 3-asset threshold",
+    "Avg RSI_4h=36.2 \u2014 oversold territory, BTC 1d RSI=28.67 and ETH 1d RSI=20.08 approaching crash levels",
+    "All aligned assets (BTC, ETH, XRP) fully bearish across 30m/4h/1d timeframes \u2014 no bullish trend confirmation"
+  ],
+  "error": null,
+  "assets": {
+    "BTC": {
+      "rsi_4h": 34.09,
+      "rsi_30m": 34.74,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 2.0247
+    },
+    "ETH": {
+      "rsi_4h": 33.0,
+      "rsi_30m": 35.78,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": "bullish",
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 2.614
+    },
+    "SOL": {
+      "rsi_4h": 47.17,
+      "rsi_30m": 46.47,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 2.8659
+    },
+    "XRP": {
+      "rsi_4h": 30.73,
+      "rsi_30m": 35.09,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": "bullish",
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 2.1338
+    }
+  }
+}
