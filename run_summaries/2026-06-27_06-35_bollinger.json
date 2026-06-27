@@ -1,0 +1,32 @@
+{
+  "run_at_dubai": "2026-06-27 10:35:18",
+  "strategy": "bollinger",
+  "symbols": {
+    "BTCUSDT": {
+      "signal": "HOLD",
+      "tp_pct": 0,
+      "fired": false,
+      "reason": "skip: daily trend bearish (EMA9<EMA21)"
+    },
+    "ETHUSDT": {
+      "signal": "HOLD",
+      "tp_pct": 0,
+      "fired": false,
+      "reason": "skip: daily trend bearish (EMA9<EMA21)"
+    },
+    "SOLUSDT": {
+      "signal": "HOLD",
+      "tp_pct": 0,
+      "fired": false,
+      "reason": "skip: daily trend bearish (EMA9<EMA21)"
+    },
+    "XRPUSDT": {
+      "signal": "HOLD",
+      "tp_pct": 0,
+      "fired": false,
+      "reason": "skip: daily trend bearish (EMA9<EMA21)"
+    }
+  },
+  "signals_fired": 0,
+  "errors": []
+}
