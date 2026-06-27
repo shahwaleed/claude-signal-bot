@@ -2,14 +2,12 @@
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
   "confidence": 72,
-  "market_condition": "Mixed/choppy market with bearish daily trends, misaligned timeframes, and avg RSI near midpoint",
-  "reasoning": "No divergence, crash, overbought, or recovering modes triggered; no assets fully bullish-aligned across timeframes; avg RSI 49.5 falls in ranging zone (35-65), so Rule 8 fires \u2014 bollinger is the correct default for this choppy, mean-reverting environment",
+  "market_condition": "Mixed/choppy market with no clear alignment, avg RSI near midpoint, bearish weekly trend",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, zero bullish-aligned assets); Rule 8 fires \u2014 ranging/choppy market with avg RSI 46.9 in the 35-65 zone defaults to bollinger.",
   "key_signals": [
-    "All 4 assets show misaligned trends (30m bullish vs 4h/1d bearish) indicating chop",
-    "Avg RSI_4h=49.5 \u2014 neutral zone, no directional conviction",
-    "1d RSI extremely low on BTC(28.67) and ETH(20.08) suggesting potential oversold bounce but not yet in confirmed recovering_mode",
-    "ATR elevated (avg 2.09%) with wide BB widths indicating volatility but no clear trend",
-    "7d returns negative across all assets (-5.92% to -9.0%) confirming bearish macro backdrop"
+    "No assets aligned bullish across timeframes \u2014 all show mixed 30m/4h/1d signals",
+    "Avg RSI_4h=46.9 in mid-range; ETH 1d RSI=20.08 and BTC 1d RSI=28.67 signal oversold on daily",
+    "ATR avg 2.04% elevated but no directional confirmation to support vwap trigger"
   ],
-  "updated_at_dubai": "2026-06-27 18:01:10"
+  "updated_at_dubai": "2026-06-28 00:01:05"
 }
