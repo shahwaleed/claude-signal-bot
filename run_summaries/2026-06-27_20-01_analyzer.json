@@ -1,0 +1,64 @@
+{
+  "run_at_dubai": "2026-06-28 00:01:06",
+  "strategy_chosen": "bollinger",
+  "secondary_strategy": "ema_basic",
+  "confidence": 72,
+  "market_condition": "Mixed/choppy market with no clear alignment, avg RSI near midpoint, bearish weekly trend",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, zero bullish-aligned assets); Rule 8 fires \u2014 ranging/choppy market with avg RSI 46.9 in the 35-65 zone defaults to bollinger.",
+  "key_signals": [
+    "No assets aligned bullish across timeframes \u2014 all show mixed 30m/4h/1d signals",
+    "Avg RSI_4h=46.9 in mid-range; ETH 1d RSI=20.08 and BTC 1d RSI=28.67 signal oversold on daily",
+    "ATR avg 2.04% elevated but no directional confirmation to support vwap trigger"
+  ],
+  "error": null,
+  "assets": {
+    "BTC": {
+      "rsi_4h": 43.01,
+      "rsi_30m": 50.07,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.6044
+    },
+    "ETH": {
+      "rsi_4h": 39.64,
+      "rsi_30m": 47.65,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.9498
+    },
+    "SOL": {
+      "rsi_4h": 58.31,
+      "rsi_30m": 45.23,
+      "trend_4h": "bullish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 2.6996
+    },
+    "XRP": {
+      "rsi_4h": 46.63,
+      "rsi_30m": 47.06,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.8906
+    }
+  }
+}
