@@ -1,0 +1,64 @@
+{
+  "run_at_dubai": "2026-06-28 12:01:08",
+  "strategy_chosen": "bollinger",
+  "secondary_strategy": "ema_basic",
+  "confidence": 72,
+  "market_condition": "Broadly bearish across all timeframes with oversold 1d RSI on BTC and ETH, no divergence signals, no special modes triggered",
+  "reasoning": "Rules 1-7 do not fire (no divergence, no crash/overbought/recovering modes, no bullish-aligned assets); Rule 8 applies as market is ranging/choppy with avg RSI 40-70 range on 4h but no trend alignment, defaulting to bollinger as the best mean-reversion tool given deeply oversold 1d RSI on BTC (21.18) and ETH (16.42).",
+  "key_signals": [
+    "BTC 1d RSI=21.18 and ETH 1d RSI=16.42 \u2014 deeply oversold on daily, potential mean reversion",
+    "All 4 assets bearish-aligned on 30m and 4h, no bullish-aligned assets qualify for trend-following",
+    "No divergence, no crash/overbought/recovering modes \u2014 bollinger is the correct default handler"
+  ],
+  "error": null,
+  "assets": {
+    "BTC": {
+      "rsi_4h": 57.42,
+      "rsi_30m": 46.88,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.2493
+    },
+    "ETH": {
+      "rsi_4h": 54.64,
+      "rsi_30m": 40.13,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.5389
+    },
+    "SOL": {
+      "rsi_4h": 64.01,
+      "rsi_30m": 52.8,
+      "trend_4h": "bullish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 2.3514
+    },
+    "XRP": {
+      "rsi_4h": 55.63,
+      "rsi_30m": 44.44,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.5881
+    }
+  }
+}
