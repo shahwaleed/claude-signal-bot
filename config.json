@@ -2,12 +2,12 @@
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
   "confidence": 72,
-  "market_condition": "Mixed/choppy market with no clear alignment, avg RSI near midpoint, bearish weekly trend",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, zero bullish-aligned assets); Rule 8 fires \u2014 ranging/choppy market with avg RSI 46.9 in the 35-65 zone defaults to bollinger.",
+  "market_condition": "Bearish across most assets, no divergence, no extreme modes, mixed RSI signals with 1d RSI extremely low on BTC/ETH/XRP",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes meeting 2+ threshold, no bullish-aligned assets); Rule 8 applies as a ranging/choppy default with avg RSI 55.7 in the 35-65 zone, making bollinger the correct fallback for mean reversion given deeply oversold 1d RSI on multiple assets.",
   "key_signals": [
-    "No assets aligned bullish across timeframes \u2014 all show mixed 30m/4h/1d signals",
-    "Avg RSI_4h=46.9 in mid-range; ETH 1d RSI=20.08 and BTC 1d RSI=28.67 signal oversold on daily",
-    "ATR avg 2.04% elevated but no directional confirmation to support vwap trigger"
+    "BTC 1d RSI=21.18 and ETH 1d RSI=16.42 suggest extreme oversold conditions on daily timeframe",
+    "All major assets bearish on 30m and 1d but 4h RSI averaging 55.7 \u2014 conflicting timeframes favor mean reversion",
+    "No bullish divergence confirmed, no crash_mode triggered \u2014 bollinger handles choppy/transitional conditions by default"
   ],
-  "updated_at_dubai": "2026-06-28 00:01:05"
+  "updated_at_dubai": "2026-06-28 06:01:06"
 }
