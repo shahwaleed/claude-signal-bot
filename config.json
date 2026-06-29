@@ -2,12 +2,12 @@
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
   "confidence": 72,
-  "market_condition": "Mixed bearish pressure with oversold 30m RSI signals on BTC and ETH, no clear divergence or extreme modes",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, no bullish-aligned assets); Rule 8 fires as avg RSI_4h=52.1 sits in the 35-65 ranging zone with choppy multi-timeframe conditions.",
+  "market_condition": "Broadly bearish across all timeframes with oversold daily RSI on BTC and ETH, choppy mid-range 4h RSI, no divergence signals",
+  "reasoning": "Rules 1-5 do not trigger (no divergence, no crash/overbought/recovering mode on 2+ assets); rules 6-7 fail (0 assets bullish-aligned); rule 8 fires \u2014 ranging/choppy market with avg RSI 47.7 in the 35-65 zone defaults to bollinger",
   "key_signals": [
-    "BTC 30m RSI=9.91 extremely oversold \u2014 bollinger BUY override trigger",
-    "ETH 1d RSI=16.42 deeply oversold but no confirmed divergence",
-    "No assets bullish-aligned across timeframes, market is choppy and mean-reverting"
+    "BTC 1d RSI=21.18 and ETH 1d RSI=16.42 near extreme oversold on daily \u2014 mean reversion candidate",
+    "Avg 4h RSI=47.7 mid-range, no trend confirmation, ATR avg 1.09% below vwap threshold",
+    "All 4 assets bearish-aligned on 4h/1d but no crash_mode flags \u2014 bollinger mean reversion preferred over trend-following"
   ],
-  "updated_at_dubai": "2026-06-29 00:01:06"
+  "updated_at_dubai": "2026-06-29 06:01:12"
 }
