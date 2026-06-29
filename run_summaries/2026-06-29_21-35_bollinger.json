@@ -1,0 +1,37 @@
+{
+  "run_at_dubai": "2026-06-30 01:35:22",
+  "strategy": "bollinger",
+  "symbols": {
+    "BTCUSDT": {
+      "signal": "HOLD",
+      "tp_pct": 0,
+      "fired": false,
+      "reason": "skip: daily trend bearish (EMA9<EMA21)"
+    },
+    "ETHUSDT": {
+      "signal": "ERROR",
+      "tp_pct": 0,
+      "fired": false,
+      "reason": "400 Client Error: Bad Request for url: https://api.coingecko.com/api/v3/coins/ethereum/ohlc?vs_currency=usd&days=90"
+    },
+    "SOLUSDT": {
+      "signal": "HOLD",
+      "tp_pct": 0,
+      "fired": false,
+      "reason": "skip: daily trend bearish (EMA9<EMA21)"
+    },
+    "XRPUSDT": {
+      "signal": "HOLD",
+      "tp_pct": 0,
+      "fired": false,
+      "reason": "skip: daily trend bearish (EMA9<EMA21)"
+    }
+  },
+  "signals_fired": 0,
+  "errors": [
+    {
+      "symbol": "ETHUSDT",
+      "error": "400 Client Error: Bad Request for url: https://api.coingecko.com/api/v3/coins/ethereum/ohlc?vs_currency=usd&days=90"
+    }
+  ]
+}
