@@ -2,6 +2,21 @@ name: Market Analyzer
 
 on:
   workflow_dispatch:
+  schedule:
+    # Backup native trigger, redundant with cron-job.org's external dispatch.
+    # Added June 30 2026 after a 24+ hour gap where market_analyzer.py
+    # crashed on an uncaught Anthropic API error and no run summary was
+    # produced to flag it -- this schedule ensures the workflow fires on
+    # its own even if the external trigger silently stops working.
+    # Times are UTC; Dubai is UTC+4, matching the docstring schedule:
+    #   6:00 AM Dubai  -> 02:00 UTC
+    #   12:00 PM Dubai -> 08:00 UTC
+    #   6:00 PM Dubai  -> 14:00 UTC
+    #   12:00 AM Dubai -> 20:00 UTC
+    - cron: '0 2 * * *'
+    - cron: '0 8 * * *'
+    - cron: '0 14 * * *'
+    - cron: '0 20 * * *'
 
 # Serialise runs — prevents two analyzer runs writing config.json simultaneously,
 # and prevents an analyzer run from writing config.json while signal_bot is reading it.
