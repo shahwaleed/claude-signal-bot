@@ -1,13 +1,9 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "ema_basic",
-  "confidence": 72,
-  "market_condition": "Broadly bearish across all timeframes with oversold daily RSI on BTC and ETH, choppy mid-range 4h RSI, no divergence signals",
-  "reasoning": "Rules 1-5 do not trigger (no divergence, no crash/overbought/recovering mode on 2+ assets); rules 6-7 fail (0 assets bullish-aligned); rule 8 fires \u2014 ranging/choppy market with avg RSI 47.7 in the 35-65 zone defaults to bollinger",
-  "key_signals": [
-    "BTC 1d RSI=21.18 and ETH 1d RSI=16.42 near extreme oversold on daily \u2014 mean reversion candidate",
-    "Avg 4h RSI=47.7 mid-range, no trend confirmation, ATR avg 1.09% below vwap threshold",
-    "All 4 assets bearish-aligned on 4h/1d but no crash_mode flags \u2014 bollinger mean reversion preferred over trend-following"
-  ],
-  "updated_at_dubai": "2026-06-29 06:01:12"
+  "secondary_strategy": "",
+  "confidence": 0,
+  "market_condition": "unknown (analyzer API call failed)",
+  "reasoning": "[FALLBACK] ask_claude() failed: 400 Client Error: Bad Request for url: https://api.anthropic.com/v1/messages",
+  "key_signals": [],
+  "updated_at_dubai": "2026-06-30 12:01:02"
 }
