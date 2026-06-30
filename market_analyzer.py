@@ -24,6 +24,15 @@ Fix (June 22 2026): write_analyzer_summary() writes a structured JSON summary
 to analyzer_summary.json at the end of each run. The workflow then commits it
 to run_summaries/YYYY-MM-DD_HH-MM_analyzer.json in the repo so Claude can
 read analyzer decisions via GitHub MCP without needing browser access.
+
+Fix (June 30 2026): ask_claude() logs the Anthropic API error body on
+failure instead of swallowing it, and run() now catches ask_claude()
+failures and falls back to a safe default (bollinger) instead of crashing
+the whole script. Previously an uncaught HTTPError on a 400 from the
+Anthropic API killed the script before write_config() or
+write_analyzer_summary() ran, leaving config.json frozen on the last
+strategy and producing no analyzer run summary at all -- only a GitHub
+Actions failure email with no diagnostic detail.
 """
 
 import requests
@@ -306,6 +315,11 @@ def ask_claude(market_data):
               "messages": [{"role": "user", "content": summary}]},
         timeout=30
     )
+    if resp.status_code != 200:
+        # Log the actual Anthropic error body before raising -- the bare
+        # HTTPError message alone ("400 Client Error: Bad Request") gives
+        # no diagnostic detail in GitHub Actions logs.
+        print(f"  Anthropic API error {resp.status_code}: {resp.text}")
     resp.raise_for_status()
     return parse_claude_json(resp.json()["content"][0]["text"])
 
@@ -438,7 +452,27 @@ def run():
               f"overbought={d['overbought_mode']} | recovering={d['recovering_mode']}")
 
     print("\n[2/3] Claude analyzing conditions...")
-    rec = ask_claude(data)
+    api_error = None
+    try:
+        rec = ask_claude(data)
+    except Exception as e:
+        # Don't let a transient Anthropic API failure kill the whole run.
+        # Fall back to bollinger (the most reliable strategy in production,
+        # selected ~85% of the time anyway) so config.json and the run
+        # summary both still get written, instead of freezing on whatever
+        # strategy was last selected with zero visibility into why.
+        api_error = str(e)
+        print(f"  ERROR calling Claude API: {api_error}")
+        print("  Falling back to bollinger (safe default).")
+        rec = {
+            "recommended_strategy": "bollinger",
+            "secondary_strategy": "",
+            "confidence": 0,
+            "market_condition": "unknown (analyzer API call failed)",
+            "reasoning": f"[FALLBACK] ask_claude() failed: {api_error}",
+            "key_signals": [],
+        }
+
     print(f"\n  Recommended: {rec.get('recommended_strategy','').upper()}")
     print(f"  Secondary:   {rec.get('secondary_strategy','').upper()}")
     print(f"  Confidence:  {rec.get('confidence','')}%")
@@ -453,7 +487,7 @@ def run():
         print(f"  ERROR writing config: {e}")
 
     log_decision(rec)
-    write_analyzer_summary(rec, data)
+    write_analyzer_summary(rec, data, error=api_error)
 
     print(f"\n{'='*60}")
     print("Analysis complete. Signal bot will use new strategy on next run.")
