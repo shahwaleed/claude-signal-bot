@@ -5,5 +5,5 @@
   "market_condition": "unknown (analyzer API call failed)",
   "reasoning": "[FALLBACK] ask_claude() failed: 400 Client Error: Bad Request for url: https://api.anthropic.com/v1/messages",
   "key_signals": [],
-  "updated_at_dubai": "2026-07-10 01:26:54"
+  "updated_at_dubai": "2026-07-10 06:01:09"
 }
