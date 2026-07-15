@@ -1,0 +1,60 @@
+{
+  "run_at_dubai": "2026-07-15 08:36:20",
+  "strategy_chosen": "bollinger",
+  "secondary_strategy": "",
+  "confidence": 0,
+  "market_condition": "unknown (analyzer API call failed)",
+  "reasoning": "[FALLBACK] ask_claude() failed: 400 Client Error: Bad Request for url: https://api.anthropic.com/v1/messages",
+  "key_signals": [],
+  "error": "400 Client Error: Bad Request for url: https://api.anthropic.com/v1/messages",
+  "assets": {
+    "BTC": {
+      "rsi_4h": 55.02,
+      "rsi_30m": 54.35,
+      "trend_4h": "bullish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 0.9958
+    },
+    "ETH": {
+      "rsi_4h": 64.28,
+      "rsi_30m": 51.75,
+      "trend_4h": "bullish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.3906
+    },
+    "SOL": {
+      "rsi_4h": 50.79,
+      "rsi_30m": 67.31,
+      "trend_4h": "bullish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.3407
+    },
+    "XRP": {
+      "rsi_4h": 50.0,
+      "rsi_30m": 8.33,
+      "trend_4h": "bullish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.3312
+    }
+  }
+}
