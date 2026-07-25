@@ -2,24 +2,12 @@ name: Market Analyzer
 
 on:
   workflow_dispatch:
-  schedule:
-    # Backup native trigger, redundant with cron-job.org's external dispatch.
-    # Added June 30 2026 after a 24+ hour gap where market_analyzer.py
-    # crashed on an uncaught Anthropic API error and no run summary was
-    # produced to flag it -- this schedule ensures the workflow fires on
-    # its own even if the external trigger silently stops working.
-    # Times are UTC; Dubai is UTC+4, matching the docstring schedule:
-    #   6:00 AM Dubai  -> 02:00 UTC
-    #   12:00 PM Dubai -> 08:00 UTC
-    #   6:00 PM Dubai  -> 14:00 UTC
-    #   12:00 AM Dubai -> 20:00 UTC
-    - cron: '0 2 * * *'
-    - cron: '0 8 * * *'
-    - cron: '0 14 * * *'
-    - cron: '0 20 * * *'
+  # NOTE: Native cron schedule removed July 25 2026 — it was doubling
+  # analyzer runs on top of cron-job.org external triggers, consuming
+  # ~112 min/day vs GitHub Free plan ~66 min/day budget, causing
+  # quota exhaustion and failing ALL workflows since July 24 18:05 UTC.
+  # cron-job.org external dispatch remains the sole scheduler.
 
-# Serialise runs — prevents two analyzer runs writing config.json simultaneously,
-# and prevents an analyzer run from writing config.json while signal_bot is reading it.
 concurrency:
   group: market-analyzer
   cancel-in-progress: false
@@ -41,7 +29,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: pip install requests
@@ -69,7 +57,7 @@ jobs:
           git pull --rebase origin main
           git add "$SUMMARY_DEST"
           git diff --cached --quiet && echo "No changes to commit" && exit 0
-          git commit -m "Analyzer summary: $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git commit -m "Analyzer summary: $(date -u +"%Y-%m-%d %H:%M UTC")"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
