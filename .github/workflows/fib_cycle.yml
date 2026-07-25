@@ -1,0 +1,43 @@
+name: Fib Cycle Strategy
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Runs every 4 hours — frequent enough to catch Fib entries,
+    # infrequent enough to use minimal Actions minutes.
+    # This strategy fires a few times per YEAR, not per day.
+    - cron: "0 */4 * * *"
+
+concurrency:
+  group: fib-cycle
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+jobs:
+  run-fib:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run Fib cycle strategy
+        env:
+          FIB_WEBHOOK_URL: ${{ secrets.FIB_WEBHOOK_URL }}
+          FIB_WEBHOOK_SECRET: ${{ secrets.FIB_WEBHOOK_SECRET }}
+          FIB_BOT_UUID_BTC: ${{ secrets.FIB_BOT_UUID_BTC }}
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python strategy_fib_cycle.py
