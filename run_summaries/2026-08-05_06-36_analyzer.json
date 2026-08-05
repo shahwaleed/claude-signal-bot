@@ -1,0 +1,64 @@
+{
+  "run_at_dubai": "2026-08-05 10:36:53",
+  "strategy_chosen": "bollinger",
+  "secondary_strategy": "ema_basic",
+  "confidence": 72,
+  "market_condition": "Ranging/choppy market with mixed trends, avg RSI near midpoint, no strong directional alignment",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, zero assets fully bullish-aligned); Rule 8 fires as avg RSI 48.5 falls within 35-65 range indicating a ranging market best handled by mean reversion.",
+  "key_signals": [
+    "avg RSI_4h=48.5 \u2014 neutral zone, no momentum conviction",
+    "0/4 assets bullish-aligned across all timeframes, mixed/conflicting trends",
+    "avg ATR=1.01% below 1.5% threshold, low volatility choppy conditions"
+  ],
+  "error": null,
+  "assets": {
+    "BTC": {
+      "rsi_4h": 59.1,
+      "rsi_30m": 52.88,
+      "trend_4h": "bullish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 0.918
+    },
+    "ETH": {
+      "rsi_4h": 43.88,
+      "rsi_30m": 47.61,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.0735
+    },
+    "SOL": {
+      "rsi_4h": 50.88,
+      "rsi_30m": 51.04,
+      "trend_4h": "bullish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 1.1286
+    },
+    "XRP": {
+      "rsi_4h": 40.28,
+      "rsi_30m": 38.46,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 0.9372
+    }
+  }
+}
