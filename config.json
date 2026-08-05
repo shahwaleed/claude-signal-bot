@@ -2,14 +2,12 @@
   "strategy": "bollinger",
   "secondary_strategy": "ema_basic",
   "confidence": 72,
-  "market_condition": "Ranging/choppy market with mixed trends, moderate RSI, and low ATR across all assets",
-  "reasoning": "Rule 8 fired: no divergence, no crash/overbought/recovering modes, zero assets fully bullish-aligned, avg RSI 48.5 in 35-65 range with low ATR 1.01% \u2014 classic ranging/choppy conditions default to bollinger",
+  "market_condition": "Choppy, mixed-trend market with no clear alignment across timeframes",
+  "reasoning": "No divergence, crash, overbought, or recovering conditions met; zero assets fully bullish-aligned; market is ranging/choppy with avg RSI 56.6 in the 35-65 zone, triggering Rule 8 (bollinger default).",
   "key_signals": [
-    "avg RSI_4h=48.5 in ranging zone (35-65)",
-    "avg ATR=1.01% below 1.5% threshold \u2014 low volatility",
-    "0/4 assets bullish-aligned, ETH and XRP fully bearish-aligned",
-    "No divergence, no crash/overbought/recovering modes on any asset",
-    "BTC and SOL showing mixed timeframe signals \u2014 choppy, no clear trend"
+    "0/4 assets bullish-aligned across all timeframes",
+    "Avg ATR 0.94% well below 1.5% threshold \u2014 low volatility environment",
+    "XRP only asset with full bearish alignment, dragging sentiment; avg RSI 56.6 in neutral zone"
   ],
-  "updated_at_dubai": "2026-08-05 12:01:15"
+  "updated_at_dubai": "2026-08-05 18:01:08"
 }
