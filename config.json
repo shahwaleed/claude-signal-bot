@@ -1,9 +1,13 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "",
-  "confidence": 0,
-  "market_condition": "unknown (analyzer API call failed)",
-  "reasoning": "[FALLBACK] ask_claude() failed: 400 Client Error: Bad Request for url: https://api.anthropic.com/v1/messages",
-  "key_signals": [],
-  "updated_at_dubai": "2026-08-05 06:00:58"
+  "secondary_strategy": "ema_basic",
+  "confidence": 72,
+  "market_condition": "Ranging/choppy market with mixed trends, avg RSI near midpoint, no strong directional alignment",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, zero assets fully bullish-aligned); Rule 8 fires as avg RSI 48.5 falls within 35-65 range indicating a ranging market best handled by mean reversion.",
+  "key_signals": [
+    "avg RSI_4h=48.5 \u2014 neutral zone, no momentum conviction",
+    "0/4 assets bullish-aligned across all timeframes, mixed/conflicting trends",
+    "avg ATR=1.01% below 1.5% threshold, low volatility choppy conditions"
+  ],
+  "updated_at_dubai": "2026-08-05 10:36:52"
 }
