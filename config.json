@@ -1,13 +1,9 @@
 {
   "strategy": "bollinger",
-  "secondary_strategy": "ema_basic",
-  "confidence": 72,
-  "market_condition": "Mixed/choppy market with no clear alignment, avg RSI 55.9 in mid-range, low ATR",
-  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, no aligned bullish assets); Rule 8 fires \u2014 ranging/choppy market with avg RSI 35-65, defaulting to bollinger mean reversion.",
-  "key_signals": [
-    "SOL 30m RSI=19.49 and XRP 30m RSI=17.65 near oversold \u2014 bollinger BUY signals likely on short timeframe",
-    "No assets fully aligned bullish across 30m+4h+1d, confirming choppy/ranging conditions",
-    "Low avg ATR of 0.82% and narrow BB widths (2.7-3.8%) confirm low volatility ranging environment"
-  ],
-  "updated_at_dubai": "2026-08-06 06:01:07"
+  "secondary_strategy": "",
+  "confidence": 0,
+  "market_condition": "unknown (analyzer API call failed)",
+  "reasoning": "[FALLBACK] ask_claude() failed: 400 Client Error: Bad Request for url: https://api.anthropic.com/v1/messages",
+  "key_signals": [],
+  "updated_at_dubai": "2026-08-06 08:58:22"
 }
