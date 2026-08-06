@@ -1,0 +1,64 @@
+{
+  "run_at_dubai": "2026-08-06 06:01:08",
+  "strategy_chosen": "bollinger",
+  "secondary_strategy": "ema_basic",
+  "confidence": 72,
+  "market_condition": "Mixed/choppy market with no clear alignment, avg RSI 55.9 in mid-range, low ATR",
+  "reasoning": "Rules 1-7 all fail (no divergence, no crash/overbought/recovering modes, no aligned bullish assets); Rule 8 fires \u2014 ranging/choppy market with avg RSI 35-65, defaulting to bollinger mean reversion.",
+  "key_signals": [
+    "SOL 30m RSI=19.49 and XRP 30m RSI=17.65 near oversold \u2014 bollinger BUY signals likely on short timeframe",
+    "No assets fully aligned bullish across 30m+4h+1d, confirming choppy/ranging conditions",
+    "Low avg ATR of 0.82% and narrow BB widths (2.7-3.8%) confirm low volatility ranging environment"
+  ],
+  "error": null,
+  "assets": {
+    "BTC": {
+      "rsi_4h": 66.57,
+      "rsi_30m": 40.23,
+      "trend_4h": "bullish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 0.7341
+    },
+    "ETH": {
+      "rsi_4h": 71.64,
+      "rsi_30m": 30.14,
+      "trend_4h": "bullish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 0.9188
+    },
+    "SOL": {
+      "rsi_4h": 56.12,
+      "rsi_30m": 19.49,
+      "trend_4h": "bullish",
+      "trend_1d": "bearish",
+      "aligned": false,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 0.9085
+    },
+    "XRP": {
+      "rsi_4h": 29.09,
+      "rsi_30m": 17.65,
+      "trend_4h": "bearish",
+      "trend_1d": "bearish",
+      "aligned": true,
+      "divergence": false,
+      "crash_mode": false,
+      "overbought_mode": false,
+      "recovering_mode": false,
+      "atr_pct_4h": 0.7271
+    }
+  }
+}
